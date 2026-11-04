@@ -48,9 +48,10 @@ npm test
 
 ## API keys and the free trial
 
-- Each user adds their own **OpenRouter** key in Team settings. It is stored in `~/.agentsia/config.json` (mode 600), never in the vault.
-- **Free trial**: if the app is started with `AGENTSIA_FREE_KEY=<operator OpenRouter key>`, users without a key get **2 free instructions** (Ask or Analyse). From the 3rd on they need their own key. Paper trading always needs the user's own key, because it runs on a schedule and would use up a shared key.
-- ⚠️ In a local or desktop app, a key shipped inside the app can be extracted by the user. Before distributing it, put the free key behind a small proxy server you control, with per-user limits.
+- Each user can add their own **OpenRouter** key in Team settings. It is stored in `~/.agentsia/config.json` (mode 600), never in the vault, and calls go straight to OpenRouter.
+- **Free trial**: users without a key get **2 free instructions** (Ask or Analyse) through the free-trial proxy in [`proxy/`](proxy/README.md). The proxy holds your OpenRouter key on your server, so it never ships inside the app, and it counts usage server-side.
+  - Point the app at your proxy with `AGENTSIA_FREE_PROXY=https://…`, or set `DEFAULT_FREE_PROXY` in `src/lib/config.js` before building the desktop app.
+- Paper trading always needs the user's own key, because it runs on a schedule.
 
 ## Development
 

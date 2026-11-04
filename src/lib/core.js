@@ -81,9 +81,9 @@ export class App {
     return { role, model: m.label, text };
   }
   async instruction(kind, fn) {
-    const ins = openInstruction(this.config, kind);
+    const ins = await openInstruction(this.config, kind);
     try { return await fn(ins); }
-    finally { closeInstruction(this.config, ins); }
+    finally { await closeInstruction(this.config, ins); }
   }
 
   journalContext(limit = 30) {

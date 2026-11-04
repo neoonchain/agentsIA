@@ -142,19 +142,6 @@ function mock({ propose = { action: 'open', asset: 'BTC-USD', side: 'long', stop
 }
 setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [{ t: Date.now(), open: 99, high: 101, low: 98, close: 100, volume: 10 }] });
 
-test('free tier: 2 instructions on the operator key, then the user needs their own', async () => {
-  process.env.AGENTSIA_FREE_KEY = 'operator';
-  const app = freshApp('free'); mock();
-  await app.ask('How am I doing?');
-  await app.ask('And psychology?');
-  await assert.rejects(app.ask('third'), e => e instanceof NeedKeyError);
-  assert.equal(app.config.freeUsed, 2);
-  await assert.rejects(app.decide('Range breakout', { manual: true }), e => e.code === 'NEED_KEY'); // trading never uses the free key
-  app.setConfig(updateConfig(app.config, { apiKey: 'sk-or-user' }));
-  assert.equal((await app.ask('now?')).answer, 'Draft answer');
-  delete process.env.AGENTSIA_FREE_KEY;
-});
-
 test('team ask: reviewer disagreement triggers a revision; solo uses one model', async () => {
   const app = freshApp('ask'); app.setConfig(updateConfig(app.config, { apiKey: 'k' }));
   mock({ agree: false });

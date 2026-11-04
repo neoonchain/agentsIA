@@ -3,3 +3,5 @@ desktop/node_modules/
 desktop/dist/
 .env
 *.log
+
+proxy/data/
