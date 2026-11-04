@@ -1,0 +1,14 @@
+{
+  "name": "agentsia-desktop",
+  "version": "0.1.0",
+  "description": "agentsIA desktop app (Electron wrapper around the local server)",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1"
+  }
+}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>agentsIA | Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="currentColor"><rect x="12" y="1" width="8" height="4"/><rect x="12" y="27" width="8" height="4"/><rect x="1" y="12" width="4" height="8"/><rect x="27" y="12" width="4" height="8"/><rect x="5" y="5" width="5" height="5"/><rect x="22" y="5" width="5" height="5"/><rect x="5" y="22" width="5" height="5"/><rect x="22" y="22" width="5" height="5"/></g><circle cx="16" cy="16" r="7.5" fill="none" stroke="currentColor"/><text x="16" y="19.5" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" fill="currentColor">A</text></svg>agentsia</a>
+  <nav class="tabs" id="tabs">
+    <button data-v="overview">Overview</button><button data-v="journal">Journal</button><button data-v="ask">Ask</button>
+    <button data-v="strategies">Strategies</button><button data-v="rules">Rules</button><button data-v="team">Team</button><button data-v="log">Log</button>
+  </nav>
+  <div class="top-right">
+    <div class="seg" id="modeSeg" role="group" aria-label="Model mode"><button data-mode="team">Team</button><button data-mode="solo">Solo</button></div>
+    <span class="keypill" id="keyPill"></span>
+  </div>
+</header>
+<main id="view" class="wrap"></main>
+<div class="toast" id="toast" role="status"></div>
+<dialog id="dlg"><div class="dlg-h"><b id="dlgTitle"></b><button class="x" id="dlgClose" aria-label="Close">×</button></div><div id="dlgBody" class="md"></div></dialog>
+<script src="/app.js" type="module"></script>
+</body>
+</html>

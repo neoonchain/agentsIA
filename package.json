@@ -1,0 +1,12 @@
+{
+  "name": "agentsia",
+  "version": "0.1.0",
+  "description": "Local Obsidian trading journal + AI model team that paper trades and must beat your marks before real money.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}
