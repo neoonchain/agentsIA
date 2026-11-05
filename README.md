@@ -16,13 +16,33 @@ Then open http://localhost:4317/app. The landing page is at http://localhost:431
 
 ### Desktop app
 
+Download the installer from [Releases](https://github.com/yasmekkk-glitch/agentsIA/releases/latest): `.dmg` (macOS), `.exe` (Windows), `.AppImage` or `.deb` (Linux).
+
+The installers are not code-signed yet:
+- **macOS:** right-click the app, choose Open, then Open again.
+- **Windows:** in SmartScreen, click More info, then Run anyway.
+
+To sign them, add an Apple Developer ID and a Windows certificate as GitHub secrets.
+
+**Building installers.** The *Desktop installers* GitHub Action builds all three platforms on every push that touches the app. To publish a release, push a tag:
+
+```bash
+git tag v0.1.0
+```
+
+```bash
+git push origin v0.1.0
+```
+
+**Local build** (only for the platform you are on):
+
 ```bash
 cd desktop
 npm install
-npm start
+npm run dist
 ```
 
-This opens the same app in its own window (Electron), on a free port.
+During development, `cd desktop && npm start` runs the app in a window without packaging it.
 
 ### Tests
 

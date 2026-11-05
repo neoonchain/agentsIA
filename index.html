@@ -344,6 +344,7 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
 .st-chip.real{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
 .st-chip.off{border-color:var(--red);color:var(--red)}
 .risk{border:1px solid var(--red);background:var(--red-soft);padding:20px 24px;margin-top:28px;font-size:14.5px;line-height:1.65;color:var(--ink-2)}
+.row-dl{display:flex;gap:12px;flex-wrap:wrap}
 .get{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .get>div{border:1px solid var(--line);background:#fff;padding:24px 22px;display:flex;flex-direction:column;gap:12px}
 .get .k{font-family:var(--mono);font-size:12px;color:var(--blue)}
@@ -607,13 +608,19 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
     <h2>It runs on your computer, next to your vault.</h2>
     <p>Your journal, your API keys and your Kraken key never leave your machine, so the app is installed locally instead of living on this website.</p>
   </div>
+  <div class="row-dl reveal">
+    <a class="btn dark" href="https://github.com/yasmekkk-glitch/agentsIA/releases/latest">Download for macOS <span class="arr">↓</span></a>
+    <a class="btn" href="https://github.com/yasmekkk-glitch/agentsIA/releases/latest">Windows <span class="arr">↓</span></a>
+    <a class="btn" href="https://github.com/yasmekkk-glitch/agentsIA/releases/latest">Linux <span class="arr">↓</span></a>
+  </div>
+  <p class="note-s" style="margin:12px 0 40px">Installers are unsigned for now. On macOS: right-click the app, choose Open, then Open again. On Windows: More info, then Run anyway.</p>
+  <h3 style="font-size:18px;font-weight:500;margin-bottom:16px">Or run it from source</h3>
   <div class="get reveal">
     <div><span class="k">01</span><h3>Install Node.js</h3><p>Version 20 or newer, from nodejs.org. Nothing else is needed: the app has no dependencies.</p></div>
     <div><span class="k">02</span><h3>Download agentsIA</h3><p>Get the code from GitHub and open the folder in a terminal.</p><pre>git clone https://github.com/yasmekkk-glitch/agentsIA
 cd agentsIA</pre></div>
     <div><span class="k">03</span><h3>Start it</h3><p>Then open <b>localhost:4317/app</b> in your browser. Your vault is created in <b>~/TradingVault</b>; open it in Obsidian.</p><pre>npm start</pre></div>
   </div>
-  <p class="note-s">Prefer a window of its own? Run <span class="mono">cd desktop &amp;&amp; npm install &amp;&amp; npm start</span> for the desktop app.</p>
 </div></section>
 </main>
 
