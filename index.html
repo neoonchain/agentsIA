@@ -259,14 +259,46 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
 :root{--out:cubic-bezier(.16,1,.3,1);--io:cubic-bezier(.77,0,.18,1)}
 html.lenis,html.lenis body{height:auto}
 .lenis.lenis-smooth{scroll-behavior:auto!important}
-.reveal{opacity:0;transform:translateY(42px);transition:opacity 1.1s var(--out),transform 1.3s var(--out)}
-.reveal.in{opacity:1;transform:none}
-.reveal .stg{opacity:0;transform:translateY(34px);transition:opacity 1s var(--out),transform 1.2s var(--out);transition-delay:calc(var(--i,0)*70ms)}
-.reveal.in .stg{opacity:1;transform:none}
-/* words rise out of a mask */
-.w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.08em;margin-bottom:-.08em}
-.w>span{display:inline-block;transform:translateY(105%);transition:transform 1.1s var(--out);transition-delay:calc(var(--i,0)*45ms)}
-.in .w>span,.w.in>span{transform:none}
+/* .reveal is now only a trigger; every block has its own transition */
+.reveal{opacity:1}
+.w{display:inline-block;vertical-align:top}
+.w>span{display:inline-block}
+/* headings: each word comes in rotated ~14deg from below and straightens (lusion h1) */
+[data-fx=rot] .w{overflow:hidden;padding:0 .04em .12em 0;margin:0 -.04em -.12em 0}
+[data-fx=rot] .w>span{transform:translateY(.9em) rotate(14deg);transform-origin:0 100%;opacity:0;transition:transform 1.3s var(--out),opacity .9s var(--out);transition-delay:calc(var(--i)*55ms)}
+[data-fx=rot].in .w>span{transform:none;opacity:1}
+/* headings: words fly in from different directions, tied to scroll (lusion "Bold Ideas") */
+[data-fx=scrub] .w>span{will-change:transform}
+/* paragraphs: words rise 30px from 10% opacity in a cascade (lusion body copy) */
+[data-fx=words] .w>span{transform:translateY(30px);opacity:.1;transition:transform 1.2s var(--out),opacity 1.2s var(--out);transition-delay:calc(var(--i)*12ms)}
+[data-fx=words].in .w>span{transform:none;opacity:1}
+/* slot-machine letters (lusion project titles) */
+.roll .cw{display:inline-block;white-space:nowrap}
+.roll .c{display:inline-block;position:relative;height:1.2em;line-height:1.2em;overflow:hidden;vertical-align:bottom}
+.roll .c>i{visibility:hidden;font-style:normal}
+.roll .c>span{position:absolute;left:-.3em;right:-.3em;top:0;text-align:center;transform:translateY(calc(var(--n)*-1.2em));transition:transform var(--d,1.1s) cubic-bezier(.65,0,.15,1)}
+.roll .c>span>b{display:block;height:1.2em;font-weight:inherit;font-style:normal}
+.roll.in .c>span{transform:translateY(0)}
+/* cards open from the bottom, contents rise inside (image-style reveal) */
+.fx-clip{clip-path:inset(100% 0 0 0);transition:clip-path 1.25s var(--io);transition-delay:calc(var(--i,0)*90ms)}
+.fx-clip.in{clip-path:inset(0 0 0 0)}
+.fx-clip>*{transform:translateY(60px);transition:transform 1.5s var(--out);transition-delay:calc(var(--i,0)*90ms + 120ms)}
+.fx-clip.in>*{transform:none}
+/* wipe from the left */
+.fx-wipe{clip-path:inset(0 100% 0 0);transition:clip-path 1.3s var(--io);transition-delay:calc(var(--i,0)*110ms)}
+.fx-wipe.in{clip-path:inset(0 0 0 0)}
+/* pills scale up from 80% (lusion "scroll to explore") */
+.fx-pop{transform:scale(.8);opacity:0;transition:transform 1s var(--out),opacity .8s var(--out);transition-delay:calc(var(--i,0)*60ms)}
+.fx-pop.in{transform:none;opacity:1}
+/* buttons tilt in (lusion "our approach") */
+.fx-tilt{transform:translateY(34px) rotate(8deg);transform-origin:0 100%;opacity:0;transition:transform 1.2s var(--out),opacity .9s var(--out);transition-delay:calc(var(--i,0)*80ms)}
+.fx-tilt.in{transform:none;opacity:1}
+/* rows slide in from the right */
+.fx-slide{transform:translateX(90px);opacity:0;transition:transform 1.2s var(--out),opacity 1s var(--out);transition-delay:calc(var(--i,0)*60ms)}
+.fx-slide.in{transform:none;opacity:1}
+/* numbers / labels grow from a thin line */
+.fx-line{transform:scaleY(.04);transform-origin:50% 100%;opacity:0;transition:transform 1.1s var(--io),opacity .4s;transition-delay:calc(var(--i,0)*90ms)}
+.fx-line.in{transform:none;opacity:1}
 /* hero entrance */
 .hero h1 .ln{display:block;overflow:hidden;padding-bottom:.06em;margin-bottom:-.06em}
 .hero h1 .ln>span{display:block;transform:translateY(110%);transition:transform 1.3s var(--out);transition-delay:calc(var(--i)*110ms + 150ms)}
@@ -294,8 +326,9 @@ html.loading{overflow:hidden}
 /* scroll-linked effects */
 main{position:relative;overflow-x:clip}
 main>section,main>div{position:relative;z-index:1}
+main>section.sec>.wrap,main>div.wrap{background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(22px) saturate(1.2);backdrop-filter:blur(22px) saturate(1.2);border-radius:28px}
 #scrollLine{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
-#scrollLine path{fill:none;opacity:.7;stroke:var(--sky);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+#scrollLine path{fill:none;opacity:.85;stroke:var(--sky);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
 .hero{will-change:clip-path}
 .tilt{transform-origin:50% 0;will-change:transform,opacity}
 #reel{height:230vh;position:relative}
@@ -366,7 +399,7 @@ main>section,main>div{position:relative;z-index:1}
   section.sec{padding-top:90px}
   .f-bot .wrap{flex-direction:column;gap:10px}
 }
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.reveal .stg,.w>span,.hero h1 .ln>span,.hero .hero-side>*{opacity:1!important;transform:none!important}.hero .pix{clip-path:none!important}#loader{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.w>span,.roll .c>span,.fx-clip,.fx-clip>*,.fx-wipe,.fx-pop,.fx-tilt,.fx-slide,.fx-line,.hero h1 .ln>span,.hero .hero-side>*{opacity:1!important;transform:none!important}.hero .pix{clip-path:none!important}#loader{display:none}}
 
 /* --- extras for the journal concept --- */
 .ok{color:var(--ok)!important}
@@ -973,24 +1006,28 @@ document.querySelectorAll('.reveal,#howgrid').forEach(el=>{if(el.id==='howgrid')
   const hero = document.querySelector('.hero'), heroWrap = hero.querySelector('.wrap'), pix = hero.querySelector('.pix');
   const prog = (el, start = 1, span = 1) => { const r = el.getBoundingClientRect(); return clamp((vh() * start - r.top) / (vh() * span)); };
   // blocks that lie back in 3D and flatten as they arrive
-  const tilts = [...document.querySelectorAll('.term, .vault, .flow, .steps-box')];
-  tilts.forEach(el => { el.classList.remove('reveal'); el.classList.add('tilt'); });
+  const tilts = [];
   // columns that travel at different speeds
-  const cols = [...document.querySelectorAll('.how > div')];
+  const cols = [];
   // rule drawings zoom out as they enter
-  const zooms = [...document.querySelectorAll('.rule .vis svg')];
+  const zooms = [];
   // the line drawn by scrolling
   const main = document.getElementById('main'), svg = document.getElementById('scrollLine'), path = svg.querySelector('path');
   let lineLen = 0, lineTop = 0, lineH = 0;
   function buildLine() {
     const W = main.clientWidth, top = hero.offsetHeight + 80, H = main.scrollHeight;
-    const secs = [...main.querySelectorAll(':scope > section.sec, :scope > #reel')].map(x => x.offsetTop);
-    const ys = [top, ...secs.filter(y => y > top + 200), H - 120];
-    let d = `M ${W * 0.06} ${ys[0]}`;
-    for (let i = 1; i < ys.length; i++) {
-      const x0 = i % 2 ? W * 0.06 : W * 0.94, x1 = i % 2 ? W * 0.94 : W * 0.06, y0 = ys[i - 1], y1 = ys[i], m = (y1 - y0) * 0.55;
-      d += ` C ${x0} ${y0 + m}, ${x1} ${y1 - m}, ${x1} ${y1}`;
+    // cross the page only behind each frosted section panel (blurred); run down the gutters in between
+    const panels = [...main.querySelectorAll(':scope > section.sec')].map(sec => { const w = sec.querySelector(':scope > .wrap'); return [sec.offsetTop + w.offsetTop, sec.offsetTop + w.offsetTop + w.offsetHeight]; }).filter(([a]) => a > top + 100);
+    const L = Math.max(14, W * 0.018), Rx = W - L;
+    let side = 0, d = `M ${L} ${top}`;
+    for (const [a, b] of panels) {
+      if (b - a < 320) continue;
+      const x = side ? Rx : L, nx = side ? L : Rx, y0 = a + 120, y1 = b - 120;
+      d += ` L ${x} ${y0}`;
+      d += ` C ${x} ${y0 + (y1 - y0) * 0.6}, ${nx} ${y1 - (y1 - y0) * 0.6}, ${nx} ${y1}`;
+      side = 1 - side;
     }
+    d += ` L ${side ? Rx : L} ${H - 120}`;
     svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     path.setAttribute('d', d);
     lineLen = path.getTotalLength(); lineTop = top; lineH = H - top;
@@ -1047,28 +1084,93 @@ document.querySelectorAll('.reveal,#howgrid').forEach(el=>{if(el.id==='howgrid')
     new ResizeObserver(() => { clearTimeout(rebuild.t); rebuild.t = setTimeout(rebuild, 150); }).observe(main);
     rebuild();
   }
-  /* ---------- section headings rise word by word ---------- */
-  document.querySelectorAll('.sec-head h2, .tok h2').forEach(h => {
+  /* ---------- per-element transitions copied from lusion.co ---------- */
+  const splitWords = el => {
     let i = 0;
     const walk = node => [...node.childNodes].forEach(n => {
       if (n.nodeType === 3) {
         const frag = document.createDocumentFragment();
         n.textContent.split(/(\s+)/).forEach(part => {
           if (!part) return;
-          if (/^\s+$/.test(part)) { frag.append(part); return; }
+          if (/^\s+$/.test(part)) { frag.append(' '); return; }
           const w = document.createElement('span'); w.className = 'w';
           const inner = document.createElement('span'); inner.style.setProperty('--i', i++); inner.textContent = part;
           w.append(inner); frag.append(w);
         });
         n.replaceWith(frag);
+      } else if (n.nodeType === 1 && !n.classList.contains('w')) walk(n);
+    });
+    walk(el);
+    return el;
+  };
+  const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$%#';
+  const roll = el => {
+    let k = 0;
+    const esc1 = ch => ch.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x]));
+    const walk = node => [...node.childNodes].forEach(n => {
+      if (n.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        n.textContent.split(/(\s+)/).forEach(word => {
+          if (!word) return;
+          if (/^\s+$/.test(word)) { frag.append(' '); return; }
+          const cw = document.createElement('span'); cw.className = 'cw';
+          for (const ch of word) {
+            const c = document.createElement('span'); c.className = 'c';
+            const steps = 3 + (k % 4);
+            const strip = Array.from({ length: steps }, () => `<b>${GLYPHS[Math.floor(Math.random() * GLYPHS.length)]}</b>`).join('');
+            c.innerHTML = `<i>${esc1(ch)}</i><span style="--n:${steps};--d:${(0.85 + k * 0.03).toFixed(2)}s"><b>${esc1(ch)}</b>${strip}</span>`;
+            cw.append(c); k++;
+          }
+          frag.append(cw);
+        });
+        n.replaceWith(frag);
       } else if (n.nodeType === 1) walk(n);
     });
-    walk(h);
-  });
-  /* ---------- staggered children inside reveal blocks ---------- */
-  document.querySelectorAll('.stats .stat, .facts .fact, .rules .rule, .never > div, .get > div, .tok-t > div, .ct-group .ct').forEach(el => {
-    el.classList.add('stg'); el.style.setProperty('--i', [...el.parentElement.children].indexOf(el));
-  });
+    walk(el); el.classList.add('roll');
+  };
+  const stagger = (els, cls) => els.forEach(el => { el.classList.add(cls); el.style.setProperty('--i', [...el.parentElement.children].indexOf(el)); });
+  const scrubbed = [];
+  if (!reduce) {
+    // section headings alternate between two lusion heading styles
+    [...document.querySelectorAll('main .sec-head h2, .tok h2')].forEach((h, i) => {
+      splitWords(h);
+      if (i % 2) h.dataset.fx = 'rot';
+      else { h.dataset.fx = 'scrub'; h.querySelectorAll('.w>span').forEach((w, j) => { w.dataset.dx = 0; w.dataset.dy = 34 + j * 9; }); scrubbed.push(h); }
+    });
+    document.querySelectorAll('.sec-head p, .intro p, .how p, .never p, .rule .txt p').forEach(el => { splitWords(el).dataset.fx = 'words'; });
+    document.querySelectorAll('.how h3, .never h3, .rule h3, .get h3').forEach(el => { splitWords(el).dataset.fx = 'rot'; });
+    document.querySelectorAll('.sec-label, .term-row .cmd, .ct b').forEach(roll);
+    stagger([...document.querySelectorAll('.rules .rule')], 'fx-clip');
+    stagger([...document.querySelectorAll('.get > div')], 'fx-clip');
+    stagger([...document.querySelectorAll('.never > div')], 'fx-wipe');
+    document.querySelectorAll('.risk').forEach(el => el.classList.add('fx-wipe'));
+    stagger([...document.querySelectorAll('#tabs .tab, .rule .tags span, .legend span')], 'fx-pop');
+    stagger([...document.querySelectorAll('.row-dl a, .hero-cta a')].filter(a => !a.closest('.hero')), 'fx-tilt');
+    stagger([...document.querySelectorAll('.ct-group .ct, .ct-gh, .tok-t > div')], 'fx-slide');
+    stagger([...document.querySelectorAll('.stats .stat .n, .facts .fact .n')], 'fx-line');
+    const SEL = '[data-fx=rot], [data-fx=words], .roll, .fx-clip, .fx-wipe, .fx-pop, .fx-tilt, .fx-slide, .fx-line';
+    const show = el => { el.classList.add('in'); el.querySelectorAll(SEL).forEach(x => x.classList.add('in')); };
+    const io = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; (e.target._fxKids || [e.target]).forEach(show); io.unobserve(e.target); }), { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+    // clipped elements are invisible to IntersectionObserver, so their visible parent triggers them
+    document.querySelectorAll(SEL).forEach(el => {
+      if (el.parentElement.closest('.fx-clip, .fx-wipe')) return; // revealed with its clipped ancestor
+      if (el.closest('.term')) return; // the terminal reveals all its rows at once
+      if (el.matches('.fx-clip, .fx-wipe')) { const par = el.parentElement; (par._fxKids ||= []).push(el); if (par._fxKids.length === 1) io.observe(par); }
+      else io.observe(el);
+    });
+    document.querySelectorAll('.term').forEach(t => { t._fxKids = [...t.querySelectorAll('.roll')]; io.observe(t); });
+  }
+  // words of scrubbed headings follow the scroll: far apart below the fold, settled once in place
+  const scrubFrame = () => {
+    for (const h of scrubbed) {
+      const r = h.getBoundingClientRect(), q = ease(clamp((innerHeight * 0.98 - r.top) / (innerHeight * 0.32)));
+      h.querySelectorAll('.w>span').forEach(w => {
+        w.style.transform = q >= 1 ? 'none' : `translate3d(${w.dataset.dx * (1 - q)}px,${w.dataset.dy * (1 - q)}px,0)`;
+        w.style.opacity = q >= 1 ? '' : String(clamp(q * 1.25));
+      });
+    }
+  };
+  if (!reduce) { if (lenis) lenis.on('scroll', scrubFrame); else addEventListener('scroll', scrubFrame, { passive: true }); scrubFrame(); }
   /* ---------- loader: rolling 000 → 100 on first visit this session ---------- */
   const L = document.getElementById('loader');
   const done = () => { root.classList.remove('loading'); document.body.classList.add('ready'); if (lenis) lenis.start(); };
