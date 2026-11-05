@@ -344,6 +344,14 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
 .st-chip.real{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
 .st-chip.off{border-color:var(--red);color:var(--red)}
 .risk{border:1px solid var(--red);background:var(--red-soft);padding:20px 24px;margin-top:28px;font-size:14.5px;line-height:1.65;color:var(--ink-2)}
+.get{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.get>div{border:1px solid var(--line);background:#fff;padding:24px 22px;display:flex;flex-direction:column;gap:12px}
+.get .k{font-family:var(--mono);font-size:12px;color:var(--blue)}
+.get h3{font-size:22px;font-weight:500;letter-spacing:-.02em}
+.get p{font-size:15px;line-height:1.6;color:var(--mute)}
+.get pre{font-family:var(--mono);font-size:12.5px;background:var(--ink);color:#e7e8eb;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre}
+.get .note-s{font-size:13.5px;color:var(--mute-2);margin-top:18px}
+@media (max-width:1100px){.get{grid-template-columns:1fr}}
 .risk b{color:var(--red);font-family:var(--mono);font-size:11px;letter-spacing:.24em;font-weight:500;display:block;margin-bottom:6px}
 @media (max-width:1100px){.vault{grid-template-columns:1fr}.v-side{border-right:0;border-bottom:1px solid var(--line)}.lb .m{flex-wrap:wrap;gap:6px 16px;grid-column:1/-1;order:5}}
 @media (max-width:720px){.note{padding:22px 18px}.fm{grid-template-columns:1fr;gap:2px}.fm dd{margin-bottom:8px}.v-tabs span:not(.on){display:none}.v-cap{flex-direction:column}}
@@ -592,6 +600,21 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
   </div>
   <div class="risk reveal"><b>RISK WARNING</b>Trading carries a risk of loss, including all of the capital you assign. Paper trading results do not guarantee live results: paper has no real slippage, limited liquidity or exact fees. Only assign agents money you can afford to lose. agentsIA does not provide financial advice.</div>
 </div></section>
+<!-- 10 GET THE APP -->
+<section class="sec" id="get"><div class="wrap">
+  <div class="sec-label"><i></i><span>(10)</span>GET THE APP</div>
+  <div class="sec-head reveal">
+    <h2>It runs on your computer, next to your vault.</h2>
+    <p>Your journal, your API keys and your Kraken key never leave your machine, so the app is installed locally instead of living on this website.</p>
+  </div>
+  <div class="get reveal">
+    <div><span class="k">01</span><h3>Install Node.js</h3><p>Version 20 or newer, from nodejs.org. Nothing else is needed: the app has no dependencies.</p></div>
+    <div><span class="k">02</span><h3>Download agentsIA</h3><p>Get the code from GitHub and open the folder in a terminal.</p><pre>git clone https://github.com/yasmekkk-glitch/agentsIA
+cd agentsIA</pre></div>
+    <div><span class="k">03</span><h3>Start it</h3><p>Then open <b>localhost:4317/app</b> in your browser. Your vault is created in <b>~/TradingVault</b>; open it in Obsidian.</p><pre>npm start</pre></div>
+  </div>
+  <p class="note-s">Prefer a window of its own? Run <span class="mono">cd desktop &amp;&amp; npm install &amp;&amp; npm start</span> for the desktop app.</p>
+</div></section>
 </main>
 
 <footer>
@@ -609,6 +632,15 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
 (() => {
 const $ = s => document.querySelector(s);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- APP LINKS: /app only exists when the local server serves this page ---------- */
+(async () => {
+  try {
+    const r = await fetch('/api/settings', { signal: AbortSignal.timeout(1500) });
+    if (r.ok && (r.headers.get('content-type') || '').includes('json')) return; // local app: keep /app
+  } catch { /* static hosting or file:// */ }
+  document.querySelectorAll('a[href="/app"]').forEach(a => { a.href = '#get'; a.innerHTML = 'Get the app <span class="arr">↓</span>'; });
+})();
 
 /* ---------- PIXEL WAVE ---------- */
 function pixelWave(cv){
