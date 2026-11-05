@@ -216,7 +216,7 @@ export class App {
         const heads = this.news.relevant(s.assets, 6 * 3600000, 8);
         if (heads.length) ctxParts.push(`Latest news about these assets (newest first; check timing against the candles, headlines can be stale or wrong):\n${heads.map(h => `- ${new Date(h.time).toISOString().slice(5, 16)} ${h.source}: ${h.title}`).join('\n')}`);
         const shocks = this.news.recentShocks(s.assets, 3 * 3600000);
-        if (shocks.length) ctxParts.push(`Price shocks in the last 3h: ${shocks.map(x => `${x.asset} ${x.movePct > 0 ? '+' : ''}${x.movePct}% in 3 min, volume ${x.volX}x at ${new Date(x.t).toISOString().slice(11, 16)} UTC`).join('; ')}.`);
+        if (shocks.length) ctxParts.push(`Price shocks in the last 3h: ${shocks.map(x => `${x.asset} ${x.movePct > 0 ? '+' : ''}${x.movePct}% in ${x.mins || 3} min, volume ${x.volX}x at ${new Date(x.t).toISOString().slice(11, 16)} UTC`).join('; ')}.`);
         const lessons = this.lessonsText(s.name, 6);
         if (lessons) ctxParts.push(`Lessons from this strategy's previous trades, written after each one closed. Apply them:\n${lessons}`);
         if (live) ctxParts.push('This strategy trades REAL money on Kraken: only "long" opens are possible. Prefer "hold" when the setup is not clean.');
@@ -249,7 +249,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
           : T.brake(p, { strategy: s, rules, acc, price, mode: this.config.mode, reviewerAgreed });
         const guard = this.shockUntil[p.asset];
         if (p.action === 'open' && verdict.ok && guard && guard.until > Date.now() && s.on_shock !== 'allow') {
-          verdict = { ok: false, reasons: [`Shock guard: ${p.asset} moved ${guard.movePct > 0 ? '+' : ''}${guard.movePct}% in 3 min; no new entries until ${new Date(guard.until).toISOString().slice(11, 16)} UTC`], offStrategy: false };
+          verdict = { ok: false, reasons: [`Shock guard: ${p.asset} moved ${guard.movePct > 0 ? '+' : ''}${guard.movePct}% in ${guard.mins || 3} min; no new entries until ${new Date(guard.until).toISOString().slice(11, 16)} UTC`], offStrategy: false };
         }
         if (live && p.action === 'open' && verdict.ok) {
           const extra = L.liveChecks(p, await K.ticker(p.asset), rules);
@@ -349,9 +349,9 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       const prev = this.news.shocks.find(x => x.asset === asset);
       if (prev && sh.t - prev.t < 10 * 60000) continue; // one alert per move
       this.news.shocks.unshift(sh); this.news.shocks.length = Math.min(this.news.shocks.length, 100);
-      this.shockUntil[asset] = { until: now + (Number(rules.shock_guard_min) || 15) * 60000, movePct: sh.movePct };
+      this.shockUntil[asset] = { until: now + (Number(rules.shock_guard_min) || 15) * 60000, movePct: sh.movePct, mins: sh.mins };
       const heads = this.news.relevant([asset], 30 * 60000, 2).map(h => h.title.slice(0, 90));
-      this.note(`SHOCK ${asset} ${sh.movePct > 0 ? '+' : ''}${sh.movePct}% in 3 min (volume ${sh.volX}x)${heads.length ? ' · news: ' + heads.join(' | ') : ' · no headline yet'}`);
+      this.note(`SHOCK ${asset} ${sh.movePct > 0 ? '+' : ''}${sh.movePct}% in ${sh.mins} min (volume ${sh.volX}x)${heads.length ? ' · news: ' + heads.join(' | ') : ' · no headline yet'}`);
       triggered.push(sh);
     }
     // react now instead of waiting for each strategy's interval

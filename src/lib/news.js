@@ -23,24 +23,34 @@ export const baseOf = asset => String(asset).split('-')[0].toUpperCase();
 
 /* ---------------- price shocks from 1-minute candles ---------------- */
 /**
- * candles: oldest first {t, open, high, low, close, volume}. A shock is a 3-minute move bigger than
- * both a floor (1.2% majors, 3% memecoins) and 4x the coin's own recent 3-minute volatility,
- * or a smaller move (70% of that) on 3x average volume.
+ * candles: oldest first {t, open, high, low, close, volume}. Two windows, measured by time so
+ * exchange gaps (minutes without trades) don't stretch them:
+ *  - fast: a 3-minute move bigger than both a floor (1.2% majors, 3% memecoins) and 4x the coin's
+ *    own recent 3-minute volatility, or 70% of that on 3x average volume;
+ *  - cascade: a 15-minute move past the same floor (and 4x 15-minute volatility) on 2.5x volume.
+ *    Real crashes often come down in steps (Oct 8: DOGE -4% in 25 min, never 3% in 3 min).
+ * Returns the stats of the window that fired (the fast one when both do).
  */
 export function detectShock(asset, candles, { majorPct = 1.2, memePct = 3 } = {}) {
   if (!candles || candles.length < 25) return null;
-  const c = candles.slice(-61), last = c.at(-1), ref = c.at(-4);
-  const rets = []; for (let i = 1; i < c.length - 3; i++) rets.push(Math.log(c[i].close / c[i - 1].close));
-  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
-  const sd = Math.sqrt(rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length) || 0;
-  const move3 = (last.close / ref.close - 1) * 100;
-  const avgVol = c.slice(0, -3).reduce((a, x) => a + x.volume, 0) / Math.max(1, c.length - 3);
-  const vol3 = c.slice(-3).reduce((a, x) => a + x.volume, 0) / 3;
-  const volX = avgVol > 0 ? vol3 / avgVol : 0;
-  const floor = MEMECOINS.has(baseOf(asset)) ? memePct : majorPct;
-  const threshold = Math.max(floor, 4 * sd * Math.sqrt(3) * 100);
-  const shock = Math.abs(move3) >= threshold || (Math.abs(move3) >= threshold * 0.7 && volX >= 3);
-  return { asset, t: last.t, price: last.close, movePct: +move3.toFixed(2), threshold: +threshold.toFixed(2), volX: +volX.toFixed(1), dir: move3 >= 0 ? 'up' : 'down', shock };
+  const c = candles.slice(-61), last = c.at(-1), floor = MEMECOINS.has(baseOf(asset)) ? memePct : majorPct;
+  const window = mins => {
+    const from = last.t - mins * 60000;
+    let k = c.length - 1; while (k > 0 && c[k - 1].t >= from) k--; // first candle inside the window
+    const ref = c[Math.max(0, k - 1)], base = c.slice(0, Math.max(1, k - 1)), inWin = c.slice(k);
+    const rets = []; for (let i = 1; i < base.length; i++) rets.push(Math.log(base[i].close / base[i - 1].close));
+    const mean = rets.reduce((a, b) => a + b, 0) / (rets.length || 1);
+    const sd = Math.sqrt(rets.reduce((a, b) => a + (b - mean) ** 2, 0) / (rets.length || 1)) || 0;
+    const avgVol = base.reduce((a, x) => a + x.volume, 0) / base.length;
+    const volX = avgVol > 0 ? inWin.reduce((a, x) => a + x.volume, 0) / Math.max(1, inWin.length) / avgVol : 0;
+    const move = (last.close / ref.close - 1) * 100, threshold = Math.max(floor, 4 * sd * Math.sqrt(mins) * 100);
+    return { mins, move, threshold, volX, enough: base.length >= 20 };
+  };
+  const fast = window(3), slow = window(15);
+  const fastHit = Math.abs(fast.move) >= fast.threshold || (Math.abs(fast.move) >= fast.threshold * 0.7 && fast.volX >= 3);
+  const slowHit = slow.enough && Math.abs(slow.move) >= slow.threshold && slow.volX >= 2.5;
+  const w = fastHit || !slowHit ? fast : slow;
+  return { asset, t: last.t, price: last.close, mins: w.mins, movePct: +w.move.toFixed(2), threshold: +w.threshold.toFixed(2), volX: +w.volX.toFixed(1), dir: w.move >= 0 ? 'up' : 'down', shock: fastHit || slowHit };
 }
 
 /* ---------------- sources ---------------- */

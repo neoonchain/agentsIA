@@ -268,7 +268,7 @@ const views = {
       <div class="head"><div><h1>News & shocks</h1><p>Checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
         <button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Notifications on' : 'Turn on notifications'}</button></div>
       <div class="grid g2">
-        <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${esc(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in 3 min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
+        <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${esc(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
           ${Object.keys(d.guards).length ? `<p class="sub" style="margin-top:10px">Guard active: ${Object.entries(d.guards).map(([a, g]) => `${esc(a)} until ${new Date(g.until).toLocaleTimeString()}`).join(' · ')}</p>` : ''}
           <p class="sub" style="margin-top:12px">Watching: ${d.watch.map(a => `<span class="chip">${esc(a)}</span>`).join(' ')}</p></div>
         <div class="card"><h3>Sources</h3><div class="srcs">${Object.entries(d.status).map(([k, s]) => `<div><span class="dot ${s.ok ? 'ok' : 'bad'}"></span><b>${esc(k)}</b><span class="sub">${s.ok ? `checked ${agoS(s.at)} ago` : esc(s.error)}</span></div>`).join('') || '<p class="empty">Starting…</p>'}</div></div>
@@ -467,7 +467,7 @@ async function watchNews() {
     const d = await api('/news'), watch = new Set(d.watch.map(a => a.split('-')[0]));
     const latest = Math.max(0, ...d.shocks.map(s => s.t), ...d.items.filter(i => i.coins.some(c => watch.has(c))).map(i => i.seenAt || 0));
     if (newsSeen === null) { newsSeen = latest; return; }
-    const fresh = [...d.shocks.filter(s => s.t > newsSeen).map(s => `Shock ${s.asset} ${s.movePct > 0 ? '+' : ''}${s.movePct}% in 3 min`),
+    const fresh = [...d.shocks.filter(s => s.t > newsSeen).map(s => `Shock ${s.asset} ${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min`),
       ...d.items.filter(i => (i.seenAt || 0) > newsSeen && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => i.title.slice(0, 120))];
     newsSeen = Math.max(newsSeen, latest);
     for (const msg of fresh) {

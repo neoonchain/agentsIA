@@ -51,7 +51,7 @@ export function createServer(app = new App()) {
         const type = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', svg: 'image/svg+xml' }[url.pathname.split('.').pop()];
         if (fs.existsSync(f)) return send(200, fs.readFileSync(f), type);
       }
-      if (req.method === 'GET' && STATIC[url.pathname]) {
+      if ((req.method === 'GET' || req.method === 'HEAD') && STATIC[url.pathname]) {
         const [file, type] = STATIC[url.pathname];
         return send(200, fs.readFileSync(file), type);
       }

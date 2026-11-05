@@ -45,6 +45,11 @@ test('shock detector: big fast move on volume fires, memecoins need more, noise 
   assert.equal(detectShock('DOGE-USD', candles(0.16, 2, 1)).shock, false); // 2% is normal for a memecoin
   assert.equal(detectShock('DOGE-USD', candles(0.16, -5, 4)).shock, true);
   assert.equal(detectShock('BTC-USD', candles(80000, 2).slice(0, 10)), null); // not enough data
+  // staircase crash: -4% spread over 15 minutes on heavy volume, never 3% in any 3 minutes (Oct 8 2026, DOGE)
+  const stairs = candles(0.087, 0).slice(0, 46);
+  for (let i = 0; i < 15; i++) { const p = stairs.at(-1).close, q = p * (i % 3 === 2 ? 0.9995 : 0.9965); stairs.push({ t: stairs.at(-1).t + 60000, open: p, high: p, low: q, close: q, volume: 600 }); }
+  const s = detectShock('DOGE-USD', stairs);
+  assert.equal(s.shock, true); assert.equal(s.mins, 15); assert.equal(s.dir, 'down');
 });
 
 test('hub de-duplicates and filters by asset and age', () => {
