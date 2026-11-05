@@ -261,8 +261,8 @@ html.lenis,html.lenis body{height:auto}
 .lenis.lenis-smooth{scroll-behavior:auto!important}
 .reveal{opacity:0;transform:translateY(42px);transition:opacity 1.1s var(--out),transform 1.3s var(--out)}
 .reveal.in{opacity:1;transform:none}
-.reveal .st{opacity:0;transform:translateY(34px);transition:opacity 1s var(--out),transform 1.2s var(--out);transition-delay:calc(var(--i,0)*70ms)}
-.reveal.in .st{opacity:1;transform:none}
+.reveal .stg{opacity:0;transform:translateY(34px);transition:opacity 1s var(--out),transform 1.2s var(--out);transition-delay:calc(var(--i,0)*70ms)}
+.reveal.in .stg{opacity:1;transform:none}
 /* words rise out of a mask */
 .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.08em;margin-bottom:-.08em}
 .w>span{display:inline-block;transform:translateY(105%);transition:transform 1.1s var(--out);transition-delay:calc(var(--i,0)*45ms)}
@@ -342,7 +342,7 @@ html.loading{overflow:hidden}
   section.sec{padding-top:90px}
   .f-bot .wrap{flex-direction:column;gap:10px}
 }
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.reveal .st,.w>span,.hero h1 .ln>span,.hero .hero-side>*{opacity:1!important;transform:none!important}.hero .pix{clip-path:none!important}#loader{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.reveal .stg,.w>span,.hero h1 .ln>span,.hero .hero-side>*{opacity:1!important;transform:none!important}.hero .pix{clip-path:none!important}#loader{display:none}}
 
 /* --- extras for the journal concept --- */
 .ok{color:var(--ok)!important}
@@ -963,7 +963,7 @@ document.querySelectorAll('.reveal,#howgrid').forEach(el=>{if(el.id==='howgrid')
   });
   /* ---------- staggered children inside reveal blocks ---------- */
   document.querySelectorAll('.stats .stat, .facts .fact, .rules .rule, .never > div, .get > div, .tok-t > div, .ct-group .ct').forEach(el => {
-    el.classList.add('st'); el.style.setProperty('--i', [...el.parentElement.children].indexOf(el));
+    el.classList.add('stg'); el.style.setProperty('--i', [...el.parentElement.children].indexOf(el));
   });
   /* ---------- loader: rolling 000 → 100 on first visit this session ---------- */
   const L = document.getElementById('loader');
