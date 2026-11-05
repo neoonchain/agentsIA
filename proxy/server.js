@@ -124,7 +124,7 @@ export function createProxy(S = loadSettings()) {
     try {
       r = await fetch(S.upstream, {
         method: 'POST', signal: AbortSignal.timeout(120000),
-        headers: { Authorization: `Bearer ${S.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/yasmekkk-glitch/agentsIA', 'X-Title': 'agentsIA free trial' },
+        headers: { Authorization: `Bearer ${S.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/neoonchain/agentsIA', 'X-Title': 'agentsIA free trial' },
         // no plugins (web search costs extra), no tools, capped tokens; ask OpenRouter to report the cost
         body: JSON.stringify({ model: body.model, messages, max_tokens: maxTokens, usage: { include: true } }),
       });

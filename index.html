@@ -351,6 +351,11 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
 .get h3{font-size:22px;font-weight:500;letter-spacing:-.02em}
 .get p{font-size:15px;line-height:1.6;color:var(--mute)}
 .get pre{font-family:var(--mono);font-size:12.5px;background:var(--ink);color:#e7e8eb;padding:12px 14px;border-radius:8px;overflow-x:auto;white-space:pre}
+.code{position:relative}
+.code pre{padding-right:78px}
+.copy{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:var(--sky);border:0;border-radius:6px;padding:6px 9px;cursor:pointer}
+.copy:hover{background:var(--sky-2)}
+.copy.done{background:var(--lime);color:var(--lime-ink)}
 .get .note-s{font-size:13.5px;color:var(--mute-2);margin-top:18px}
 @media (max-width:1100px){.get{grid-template-columns:1fr}}
 .risk b{color:var(--red);font-family:var(--mono);font-size:11px;letter-spacing:.24em;font-weight:500;display:block;margin-bottom:6px}
@@ -609,17 +614,17 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
     <p>Your journal, your API keys and your Kraken key never leave your machine, so the app is installed locally instead of living on this website.</p>
   </div>
   <div class="row-dl reveal">
-    <a class="btn dark" href="https://github.com/yasmekkk-glitch/agentsIA/releases/latest">Download for macOS <span class="arr">↓</span></a>
-    <a class="btn" href="https://github.com/yasmekkk-glitch/agentsIA/releases/latest">Windows <span class="arr">↓</span></a>
-    <a class="btn" href="https://github.com/yasmekkk-glitch/agentsIA/releases/latest">Linux <span class="arr">↓</span></a>
+    <a class="btn dark" href="https://github.com/neoonchain/agentsIA/releases/latest">Download for macOS <span class="arr">↓</span></a>
+    <a class="btn" href="https://github.com/neoonchain/agentsIA/releases/latest">Windows <span class="arr">↓</span></a>
+    <a class="btn" href="https://github.com/neoonchain/agentsIA/releases/latest">Linux <span class="arr">↓</span></a>
   </div>
   <p class="note-s" style="margin:12px 0 40px">Installers are unsigned for now. On macOS: right-click the app, choose Open, then Open again. On Windows: More info, then Run anyway.</p>
   <h3 style="font-size:18px;font-weight:500;margin-bottom:16px">Or run it from source</h3>
   <div class="get reveal">
     <div><span class="k">01</span><h3>Install Node.js</h3><p>Version 20 or newer, from nodejs.org. Nothing else is needed: the app has no dependencies.</p></div>
-    <div><span class="k">02</span><h3>Download agentsIA</h3><p>Get the code from GitHub and open the folder in a terminal.</p><pre>git clone https://github.com/yasmekkk-glitch/agentsIA
-cd agentsIA</pre></div>
-    <div><span class="k">03</span><h3>Start it</h3><p>Then open <b>localhost:4317/app</b> in your browser. Your vault is created in <b>~/TradingVault</b>; open it in Obsidian.</p><pre>npm start</pre></div>
+    <div><span class="k">02</span><h3>Download agentsIA</h3><p>Get the code from GitHub and open the folder in a terminal.</p><div class="code"><pre>git clone https://github.com/neoonchain/agentsIA
+cd agentsIA</pre><button class="copy" type="button">Copy</button></div></div>
+    <div><span class="k">03</span><h3>Start it</h3><p>Then open <b>localhost:4317/app</b> in your browser. Your vault is created in <b>~/TradingVault</b>; open it in Obsidian.</p><div class="code"><pre>npm start</pre><button class="copy" type="button">Copy</button></div></div>
   </div>
 </div></section>
 </main>
@@ -639,6 +644,16 @@ cd agentsIA</pre></div>
 (() => {
 const $ = s => document.querySelector(s);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- COPY BUTTONS ---------- */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('.copy'); if (!b) return;
+  const text = b.parentElement.querySelector('pre').textContent;
+  try { await navigator.clipboard.writeText(text); }
+  catch { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+  b.textContent = 'Copied'; b.classList.add('done');
+  setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1600);
+});
 
 /* ---------- APP LINKS: /app only exists when the local server serves this page ---------- */
 (async () => {

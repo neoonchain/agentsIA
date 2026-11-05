@@ -16,7 +16,7 @@
     "electron-builder": "^25.1.8"
   },
   "author": "agentsIA",
-  "homepage": "https://github.com/yasmekkk-glitch/agentsIA",
+  "homepage": "https://github.com/neoonchain/agentsIA",
   "build": {
     "appId": "io.agentsia.desktop",
     "productName": "agentsIA",
@@ -85,7 +85,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "yasmekkk-glitch",
+        "owner": "neoonchain",
         "repo": "agentsIA",
         "releaseType": "release"
       }
