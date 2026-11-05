@@ -76,7 +76,7 @@ $('#modeSeg').onclick = async e => {
   catch (er) { fail(er); }
 };
 $('#tabs').onclick = e => { const v = e.target.closest('button')?.dataset.v; if (v) go(v); };
-function go(v) { current = v; location.hash = v; render(); }
+function go(v) { current = v; location.hash = v; render(true); }
 
 /* ---------- views ---------- */
 const views = {
@@ -322,9 +322,10 @@ document.addEventListener('click', e => {
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (views[v] && v !== current) { current = v; render(); } });
 
 async function refreshSettings() { settings = await api('/settings'); renderHeader(); }
-async function render() {
+async function render(enter = false) {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === current));
-  try { await views[current](); } catch (e) { view.innerHTML = `<div class="banner">${esc(e.message)}</div>`; }
+  view.classList.remove('enter');
+  try { await views[current](); if (enter) { void view.offsetWidth; view.classList.add('enter'); } } catch (e) { view.innerHTML = `<div class="banner">${esc(e.message)}</div>`; }
 }
 
 (async () => {
