@@ -141,7 +141,10 @@ export function createProxy(S = loadSettings()) {
   }
 
   const server = http.createServer(async (req, res) => {
-    const send = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(JSON.stringify(obj)); };
+    // The web app calls the proxy straight from the browser; tickets, not cookies, authorise calls, so any origin is fine.
+    const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' };
+    const send = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors }); res.end(JSON.stringify(obj)); };
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
     try {
       const ip = (S.trustProxy && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '';
       const ipHash = hashIp(ip);

@@ -343,6 +343,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   async setKraken({ key, secret }) {
+    if (globalThis.AGENTSIA_WEB) throw Object.assign(new Error('Real money runs only in the desktop app, so your Kraken key never sits in a web page.'), { status: 400 });
     key = String(key || '').trim(); secret = String(secret || '').trim();
     if (!key || !secret) throw Object.assign(new Error('Paste both the API key and the private key'), { status: 400 });
     const creds = { key, secret };
@@ -358,6 +359,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   async enableLive(name, { mode, confirm }) {
+    if (globalThis.AGENTSIA_WEB) throw Object.assign(new Error('Real money runs only in the desktop app. Download it from the landing page.'), { status: 400 });
     const s = this.strategy(name), promo = this.state.promotions[name];
     if (promo?.status !== 'approved') throw Object.assign(new Error('Approve the promotion first'), { status: 400 });
     if (!this.config.kraken) throw Object.assign(new Error('Connect a Kraken key in Team settings first'), { status: 400, code: 'NEED_EXCHANGE' });

@@ -87,5 +87,5 @@ export function publicConfig(c) {
   const { apiKey, installId, kraken, ...rest } = c;
   const left = c.freeRemaining ?? FREE_LIMIT;
   return { ...rest, hasApiKey: !!apiKey, apiKeyHint: apiKey ? '…' + apiKey.slice(-4) : '', freeLimit: FREE_LIMIT, freeUsed: Math.max(FREE_LIMIT - left, 0),
-    freeAvailable: !!freeProxyUrl(c), hasKraken: !!kraken, krakenHint: kraken ? '…' + kraken.key.slice(-4) : '', krakenCheckedAt: kraken?.checkedAt || null, catalog: { models: MODELS, roles: ROLES } };
+    freeAvailable: !!freeProxyUrl(c), web: !!globalThis.AGENTSIA_WEB, vaultLabel: globalThis.AGENTSIA_VAULT_LABEL || c.vaultPath, hasKraken: !!kraken, krakenHint: kraken ? '…' + kraken.key.slice(-4) : '', krakenCheckedAt: kraken?.checkedAt || null, catalog: { models: MODELS, roles: ROLES } };
 }

@@ -11,6 +11,11 @@ const agoText = iso => { const a = ago(iso); return a === 'now' ? 'just now' : a
 let settings = null, current = 'overview', selected = null;
 
 async function api(path, opts = {}) {
+  if (window.__agentsiaApi) { // web version: the engine runs in this tab
+    const r = await window.__agentsiaApi(opts.method || 'GET', '/api' + path, opts.body ? JSON.parse(JSON.stringify(opts.body)) : {});
+    if (r.status >= 400) { const e = new Error(r.body.error || 'Request failed'); e.code = r.body.code; e.status = r.status; throw e; }
+    return JSON.parse(JSON.stringify(r.body));
+  }
   const r = await fetch('/api' + path, { ...opts, headers: { 'Content-Type': 'application/json', 'X-Agentsia': '1', ...(opts.headers || {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined });
   const j = await r.json().catch(() => ({ error: 'Bad response' }));
@@ -79,8 +84,9 @@ const views = {
     const s = await api('/status'); const j = s.journal;
     const free = !settings.hasApiKey;
     view.innerHTML = `
-      <div class="head"><div><h1>Overview</h1><p>Vault: <span class="mono">${esc(s.vault)}</span> · open it in Obsidian as a vault.</p></div>
+      <div class="head"><div><h1>Overview</h1><p>${settings.web ? `Vault: ${esc(settings.vaultLabel)}.` : `Vault: <span class="mono">${esc(s.vault)}</span> · open it in Obsidian as a vault.`}</p></div>
         <div class="row"><button class="btn" data-go="journal">Log a trade</button><button class="btn dark" data-go="ask">Ask the ${settings.mode === 'team' ? 'team' : 'model'}</button></div></div>
+      ${settings.web ? `<div class="banner info">Web version: running strategies trade on paper while this tab is open. For 24/7 paper trading and real money on Kraken, use the <a href="/#get">desktop app</a>.</div>` : ''}
       ${free ? `<div class="banner ${settings.freeAvailable ? 'info' : ''}">${settings.freeAvailable ? `You have <b>${Math.max(settings.freeLimit - settings.freeUsed, 0)} of ${settings.freeLimit}</b> free instructions (Ask or Analyse). After that, and for paper trading, add your own OpenRouter API key in <a href="#team">Team</a>.` : `Add your OpenRouter API key in <a href="#team">Team</a> to use the models. Journaling works without it.`}</div>` : ''}
       <div class="grid g4">
         <div class="card stat"><span class="eyebrow">Journal trades</span><div class="n">${s.journalCount}</div></div>
@@ -185,11 +191,12 @@ const views = {
         </div>
         <div class="card"><h2>OpenRouter API key</h2><p class="sub" style="margin:8px 0 12px">${c.hasApiKey ? `Saved (${esc(c.apiKeyHint)}). Stored only on this computer in <span class="mono">~/.agentsia/config.json</span>, never in the vault.` : c.freeAvailable ? `You are on the free trial: ${Math.max(c.freeLimit - c.freeUsed, 0)} of ${c.freeLimit} instructions left. Paper trading needs your own key.` : 'Needed to use the models. Get one at openrouter.ai/keys.'}</p>
           <div class="row"><input id="key" type="password" placeholder="sk-or-..." autocomplete="off" style="flex:1"><button class="btn dark" id="saveKey">Save key</button>${c.hasApiKey ? '<button class="btn red" id="delKey">Remove</button>' : ''}</div>
-          <label style="margin-top:16px">Vault folder<input id="vault" value="${esc(c.vaultPath)}"></label><button class="btn sm" id="saveVault" style="margin-top:8px">Change vault</button></div>
+          ${c.web ? `<p class="sub" style="margin-top:16px">Vault: <b>${esc(c.vaultLabel)}</b></p><div class="row" style="margin-top:8px"><button class="btn sm" id="zipVault">Export vault (.zip)</button><button class="btn sm" id="switchVault">Use another place</button></div>`
+            : `<label style="margin-top:16px">Vault folder<input id="vault" value="${esc(c.vaultPath)}"></label><button class="btn sm" id="saveVault" style="margin-top:8px">Change vault</button>`}</div>
       </div>
-      <div class="card" style="margin-top:16px"><h2>Kraken · real money</h2>
+      ${c.web ? `<div class="card" style="margin-top:16px"><h2>Kraken · real money</h2><p class="sub" style="margin-top:8px">Real money runs only in the <a href="/#get">desktop app</a>, so your Kraken key never sits in a web page.</p></div>` : `<div class="card" style="margin-top:16px"><h2>Kraken · real money</h2>
         <p class="sub" style="margin:8px 0 12px">${c.hasKraken ? `Connected (${esc(c.krakenHint)}), checked ${esc(String(c.krakenCheckedAt).slice(0, 10))}: can trade, cannot withdraw.` : 'On Kraken: Settings → API → Create key. Enable only <b>Query Funds</b>, <b>Query Open/Closed Orders & Trades</b>, <b>Create & Modify Orders</b> and <b>Cancel/Close Orders</b>. Never enable Withdraw: the app refuses keys that can.'} Keys stay on this computer only.</p>
-        <div class="row"><input id="krKey" placeholder="API key" autocomplete="off" style="flex:1"><input id="krSecret" type="password" placeholder="Private key" autocomplete="off" style="flex:1"><button class="btn dark" id="saveKr" data-busy="Checking key">Connect</button>${c.hasKraken ? '<button class="btn red" id="delKr">Remove</button>' : ''}</div></div>
+        <div class="row"><input id="krKey" placeholder="API key" autocomplete="off" style="flex:1"><input id="krSecret" type="password" placeholder="Private key" autocomplete="off" style="flex:1"><button class="btn dark" id="saveKr" data-busy="Checking key">Connect</button>${c.hasKraken ? '<button class="btn red" id="delKr">Remove</button>' : ''}</div></div>`}
       <div class="card" style="margin-top:16px"><h2>Roles</h2><p class="sub" style="margin:6px 0 12px">Used in Team mode. Lead is always on. Brake (risk) is code, not a model.</p>
         <div class="tblwrap"><table><tr><th>On</th><th>Role</th><th>What it does</th><th>Model</th></tr>
         ${Object.entries(R).map(([k, r]) => `<tr><td><input type="checkbox" data-role-on="${k}" ${c.enabledRoles[k] ? 'checked' : ''} ${k === 'lead' ? 'disabled' : ''} style="width:auto"></td><td><b>${esc(r.label)}</b></td><td class="sub">${esc(r.desc)}</td><td><select data-role="${k}">${opts(c.roles[k])}</select></td></tr>`).join('')}</table></div></div>
@@ -204,9 +211,10 @@ const views = {
     view.querySelectorAll('[data-role-on]').forEach(s => (s.onchange = () => save({ enabledRoles: { [s.dataset.roleOn]: s.checked } }, 'Role saved')));
     $('#saveKey').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Paste a key first', true); save({ apiKey: k }, 'Key saved'); };
     if ($('#delKey')) $('#delKey').onclick = () => save({ apiKey: '' }, 'Key removed');
-    $('#saveKr').onclick = e => busy(e.currentTarget, async () => { settings = await api('/exchange', { method: 'PUT', body: { key: $('#krKey').value, secret: $('#krSecret').value } }); renderHeader(); toast('Kraken connected: trade only, no withdrawals'); render(); });
+    if ($('#zipVault')) { $('#zipVault').onclick = () => window.__agentsiaWeb.exportZip(); $('#switchVault').onclick = () => { if (confirm('Switch to another vault? This one stays where it is.')) window.__agentsiaWeb.switchVault(); }; }
+    if ($('#saveKr')) $('#saveKr').onclick = e => busy(e.currentTarget, async () => { settings = await api('/exchange', { method: 'PUT', body: { key: $('#krKey').value, secret: $('#krSecret').value } }); renderHeader(); toast('Kraken connected: trade only, no withdrawals'); render(); });
     if ($('#delKr')) $('#delKr').onclick = async () => { try { settings = await api('/exchange', { method: 'DELETE' }); toast('Kraken key removed'); render(); } catch (er) { fail(er); } };
-    $('#saveVault').onclick = () => save({ vaultPath: $('#vault').value }, 'Vault changed');
+    if ($('#saveVault')) $('#saveVault').onclick = () => save({ vaultPath: $('#vault').value }, 'Vault changed');
     $('#saveIds').onclick = () => save({ models: Object.fromEntries([...view.querySelectorAll('[data-model]')].map(i => [i.dataset.model, i.value])) }, 'Model IDs saved');
   },
 
@@ -281,6 +289,7 @@ function liveCard(s) {
   const l = s.live, on = l && l.enabled;
   const head = `<div class="head" style="margin-bottom:10px"><div><h3>Real money · Kraken spot ${on ? (l.mode === 'real' ? '<span class="chip ok">live · real</span>' : '<span class="chip run">validate mode</span>') : ''}</h3>
     <p class="sub" style="margin-top:6px">Long only, no leverage. Every buy gets a stop-loss order on Kraken. Brake checks liquidity and spread before each buy; memecoins included if Kraken lists them.</p></div>`;
+  if (settings.web) return `<div class="card" style="margin-top:16px">${head}</div><div class="banner info">Approved. Real money runs only in the <a href="/#get">desktop app</a>: open this vault there to go live on Kraken.</div></div>`;
   if (!s.exchange.connected) return `<div class="card" style="margin-top:16px">${head}</div><div class="banner info">Connect a Kraken API key in <a href="#team">Team</a> first (trade-only, no withdrawals).</div></div>`;
   if (!on) return `<div class="card" style="margin-top:16px">${head}<div class="row"><button class="btn" data-live="validate" data-busy="Checking">Go live · validate mode</button><button class="btn dark" data-live="real" data-busy="Checking">Go live · real money</button></div></div>
     <p class="sub">${l?.stoppedReason ? `Last live run stopped: ${esc(l.stoppedReason)}. ` : ''}Validate mode sends every order to Kraken for checking but executes nothing. Start there.</p></div>`;

@@ -4,6 +4,15 @@ A local trading journal in an Obsidian vault, plus AI models (Claude Opus 5.5, F
 
 > Real money runs on **Kraken spot** (long only, no leverage), only for strategies whose promotion you approved, and only after you type the strategy name to confirm. Trading can lose money; paper results do not guarantee live results.
 
+## Use it on the web
+
+Open **/app** on the website: no install and no account. The same app and engine run inside your browser.
+- **Your vault:** pick your Obsidian folder (Chrome, Edge, Brave) or keep it in the browser. You can export it as a `.zip` to open it in Obsidian.
+- **Your data:** your OpenRouter key and notes stay in your browser. Model calls go straight from your browser to OpenRouter.
+- **Paper trading** runs while the tab is open. For 24/7 trading and real money on Kraken, use the desktop app.
+
+**Deploying to Netlify:** connect the repository. `netlify.toml` runs `node scripts/build-web.mjs` and publishes `site/`. To offer the free trial on the web, set `AGENTSIA_FREE_PROXY` in Netlify's environment variables.
+
 ## Run it
 
 Needs Node.js 20 or newer. No dependencies to install.

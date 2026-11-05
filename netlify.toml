@@ -1,0 +1,14 @@
+# Netlify: builds the landing page and the in-browser web app into ./site
+[build]
+  command = "node scripts/build-web.mjs"
+  publish = "site"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # AGENTSIA_FREE_PROXY = "https://your-free-trial-proxy.example"  # optional: 2 free instructions per user
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

@@ -657,10 +657,10 @@ document.addEventListener('click', async e => {
 
 /* ---------- APP LINKS: /app only exists when the local server serves this page ---------- */
 (async () => {
-  try {
-    const r = await fetch('/api/settings', { signal: AbortSignal.timeout(1500) });
-    if (r.ok && (r.headers.get('content-type') || '').includes('json')) return; // local app: keep /app
-  } catch { /* static hosting or file:// */ }
+  try { // local app server, or the web app deployed next to this page (Netlify build)
+    const r = await fetch('/app', { method: 'HEAD', signal: AbortSignal.timeout(2500) });
+    if (r.ok) return;
+  } catch { /* file:// or a host without /app */ }
   document.querySelectorAll('a[href="/app"]').forEach(a => { a.href = '#get'; a.innerHTML = 'Get the app <span class="arr">↓</span>'; });
 })();
 
