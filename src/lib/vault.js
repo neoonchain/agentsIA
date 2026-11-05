@@ -234,7 +234,7 @@ export function createJournalTrade(root, t) {
   const asset = safeName(t.asset || 'ASSET').toUpperCase();
   const data = {
     date, asset, side, entry: num(t.entry) ?? 0, stop: num(t.stop) ?? 0, exit: num(t.exit) ?? 0, size: num(t.size) ?? 0,
-    pnl: num(t.pnl) ?? 0, strategy: String(t.strategy || ''), emotion: String(t.emotion || ''),
+    pnl: num(t.pnl) ?? 0, r: num(t.r) ?? undefined, strategy: String(t.strategy || ''), emotion: String(t.emotion || ''),
     tags: String(t.tags || '').split(',').map(s => s.trim().replace(/^#/, '')).filter(Boolean),
   };
   const body = `## Thesis\n${t.thesis || ''}\n\n## Psychology\n${t.psychology || ''}\n\n## Went well\n${t.wentWell || ''}\n\n## Went wrong\n${t.wentWrong || ''}\n`;
