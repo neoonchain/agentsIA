@@ -1,5 +1,6 @@
 // The JSON API, shared by the local server and the in-browser web app.
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { updateConfig, publicConfig } from './config.js';
 import * as V from './vault.js';
 import * as T from './trading.js';
@@ -26,6 +27,21 @@ export function createApi(app) {
     ['GET', /^\/api\/journal$/, async () => V.listJournal(app.vault)],
     ['POST', /^\/api\/journal$/, async (_, b) => ({ path: V.createJournalTrade(app.vault, b) })],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
+    ['GET', /^\/api\/news$/, async () => ({ items: app.news.items.slice(0, 120), shocks: app.news.shocks.slice(0, 30), status: app.news.status, watch: app.watchedAssets(),
+      guards: Object.fromEntries(Object.entries(app.shockUntil).filter(([, g]) => g.until > Date.now())) })],
+    ['GET', /^\/api\/news\/settings$/, async () => ({ ...app.config.news, hasXBearer: !!app.config.xBearer })],
+    ['PUT', /^\/api\/news\/settings$/, async (_, b) => {
+      const n = { ...app.config.news };
+      for (const k of ['tree', 'rss', 'x']) if (typeof b[k] === 'boolean') n[k] = b[k];
+      if (typeof b.xQuery === 'string' && b.xQuery.trim()) n.xQuery = b.xQuery.trim().slice(0, 512);
+      if (Array.isArray(b.watch)) n.watch = [...new Set(b.watch.map(a => String(a).trim().toUpperCase()).filter(a => /^[A-Z0-9]{2,10}-[A-Z]{3,4}$/.test(a)))].slice(0, 20);
+      if (b.rotateToken) n.webhookToken = crypto.randomUUID().replace(/-/g, '');
+      const c = { ...app.config, news: n };
+      if (typeof b.xBearer === 'string') c.xBearer = b.xBearer.trim();
+      app.setConfig(c);
+      return { ...app.config.news, hasXBearer: !!app.config.xBearer };
+    }],
+    ['POST', /^\/api\/news\/test$/, async () => app.addNews({ title: 'Test alert: this is how forwarded news appears (BTC)', source: 'test' }, 'test')],
     ['GET', /^\/api\/image$/, async q => ({ dataUrl: V.readImage(app.vault, q.get('path')) })],
     ['GET', /^\/api\/notes$/, async q => V.listNotes(app.vault, q.get('dir') || '.')],
     ['GET', /^\/api\/rules$/, async () => app.rules()],

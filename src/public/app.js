@@ -256,6 +256,56 @@ const views = {
     if (selected) await renderStrategy(selected);
   },
 
+  async news() {
+    const [d, ns] = await Promise.all([api('/news'), api('/news/settings')]);
+    const watch = new Set(d.watch.map(a => a.split('-')[0]));
+    const onlyWatched = views.news.only !== false;
+    const items = d.items.filter(i => !onlyWatched || i.coins.some(c => watch.has(c)));
+    const agoS = t => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? Math.round(s) + 's' : s < 3600 ? Math.round(s / 60) + 'm' : Math.round(s / 3600) + 'h'; };
+    const hookUrl = `${location.origin}/api/news/webhook`;
+    const web = settings.web;
+    view.innerHTML = `
+      <div class="head"><div><h1>News & shocks</h1><p>Checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
+        <button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Notifications on' : 'Turn on notifications'}</button></div>
+      <div class="grid g2">
+        <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${esc(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in 3 min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
+          ${Object.keys(d.guards).length ? `<p class="sub" style="margin-top:10px">Guard active: ${Object.entries(d.guards).map(([a, g]) => `${esc(a)} until ${new Date(g.until).toLocaleTimeString()}`).join(' · ')}</p>` : ''}
+          <p class="sub" style="margin-top:12px">Watching: ${d.watch.map(a => `<span class="chip">${esc(a)}</span>`).join(' ')}</p></div>
+        <div class="card"><h3>Sources</h3><div class="srcs">${Object.entries(d.status).map(([k, s]) => `<div><span class="dot ${s.ok ? 'ok' : 'bad'}"></span><b>${esc(k)}</b><span class="sub">${s.ok ? `checked ${agoS(s.at)} ago` : esc(s.error)}</span></div>`).join('') || '<p class="empty">Starting…</p>'}</div></div>
+      </div>
+      <div class="row jfilter" style="margin-top:18px" id="nfilter"><button class="chipbtn ${onlyWatched ? 'on' : ''}" data-o="1">Watched coins</button><button class="chipbtn ${onlyWatched ? '' : 'on'}" data-o="0">Everything</button><span class="sub">${items.length} items</span></div>
+      <div class="feedlist">${items.slice(0, 80).map(i => `<a class="nitem" ${i.url ? `href="${esc(i.url)}" target="_blank" rel="noopener noreferrer"` : ''}><span class="t mono">${agoS(i.time)}</span><span class="s">${esc(i.source)}</span><span class="h">${esc(i.title)}</span><span class="c">${i.coins.map(c => `<span class="chip ${watch.has(c) ? 'ok' : ''}">${esc(c)}</span>`).join('')}</span></a>`).join('') || '<p class="empty">Nothing about the watched coins yet.</p>'}</div>
+      <div class="grid g2" style="margin-top:22px">
+        <div class="card"><h3>Settings</h3>
+          <label class="check" style="margin-top:10px"><input type="checkbox" id="nTree" ${ns.tree ? 'checked' : ''}> Tree of Alpha: tweets and headlines, seconds old, free</label>
+          <label class="check"><input type="checkbox" id="nRss" ${ns.rss ? 'checked' : ''} ${web ? 'disabled' : ''}> RSS: Cointelegraph, The Block ${web ? '(desktop app only)' : ''}</label>
+          <label class="check"><input type="checkbox" id="nX" ${ns.x ? 'checked' : ''}> X API (your key, every 60 s)</label>
+          <label style="margin-top:10px">X bearer token ${ns.hasXBearer ? '(saved)' : ''}<input id="nXKey" type="password" placeholder="${ns.hasXBearer ? '•••••••• saved' : 'AAAA…'}" autocomplete="off"></label>
+          <label>X search query<input id="nXQ" value="${esc(ns.xQuery)}" class="mono"></label>
+          <label>Watch these coins (besides running strategies)<input id="nWatch" value="${esc(ns.watch.join(', '))}" class="mono"></label>
+          <div class="row" style="margin-top:12px"><button class="btn dark" id="nSave">Save</button></div></div>
+        <div class="card"><h3>Forward any alert here</h3>
+          ${web ? '<p class="sub" style="margin-top:8px">The web version has no server to receive alerts. Use the desktop app for the incoming URL.</p>' : `
+          <p class="sub" style="margin:8px 0 12px">Anything that can call a URL can feed the agents: a j7tracker → Telegram/Discord forwarder, TradingView alerts, n8n, Zapier. To receive from the internet, expose this computer with a tunnel (for example <span class="mono">cloudflared tunnel --url http://localhost:4317</span>) and use that address.</p>
+          <label>URL<input readonly value="${esc(hookUrl)}" class="mono"></label>
+          <label>Token (header X-Agentsia-Token)<input readonly value="${esc(ns.webhookToken)}" class="mono"></label>
+          <pre class="curl">curl -X POST ${esc(hookUrl)} \\
+  -H "Content-Type: application/json" \\
+  -H "X-Agentsia-Token: ${esc(ns.webhookToken)}" \\
+  -d '{"title":"$PEPE: big account just tweeted","source":"j7tracker"}'</pre>
+          <div class="row"><button class="btn sm" id="nTest">Send a test alert</button><button class="btn sm" id="nRotate">New token</button></div>`}</div>
+      </div>`;
+    $('#nfilter').onclick = e => { const b = e.target.closest('[data-o]'); if (b) { views.news.only = b.dataset.o === '1'; render(); } };
+    $('#notify').onclick = async () => { if (typeof Notification === 'undefined') return toast('This browser has no notifications', true); toast((await Notification.requestPermission()) === 'granted' ? 'Notifications on' : 'Notifications blocked', false); render(); };
+    $('#nSave').onclick = () => busy($('#nSave'), async () => {
+      const body = { tree: $('#nTree').checked, rss: $('#nRss').checked, x: $('#nX').checked, xQuery: $('#nXQ').value, watch: $('#nWatch').value.split(',') };
+      if ($('#nXKey').value.trim()) body.xBearer = $('#nXKey').value.trim();
+      await api('/news/settings', { method: 'PUT', body }); toast('News settings saved'); render();
+    });
+    if ($('#nTest')) $('#nTest').onclick = async () => { await api('/news/test', { method: 'POST' }); toast('Test alert added'); render(); };
+    if ($('#nRotate')) $('#nRotate').onclick = async () => { if (!confirm('Make a new token? Forwarders using the old one stop working.')) return; await api('/news/settings', { method: 'PUT', body: { rotateToken: true } }); render(); };
+  },
+
   async rules() {
     const r = await api('/rules');
     const label = { starting_balance: 'Paper starting balance (USD)', min_trades: 'Mark · minimum paper trades', min_days: 'Mark · minimum days on paper', min_profit_factor: 'Mark · minimum profit factor',
@@ -410,6 +460,24 @@ document.addEventListener('click', e => {
   const st = e.target.closest('[data-strat]'); if (st) { selected = st.dataset.strat; go('strategies'); }
 });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (views[v] && v !== current) { current = v; render(); } });
+
+let newsSeen = null;
+async function watchNews() {
+  try {
+    const d = await api('/news'), watch = new Set(d.watch.map(a => a.split('-')[0]));
+    const latest = Math.max(0, ...d.shocks.map(s => s.t), ...d.items.filter(i => i.coins.some(c => watch.has(c))).map(i => i.seenAt || 0));
+    if (newsSeen === null) { newsSeen = latest; return; }
+    const fresh = [...d.shocks.filter(s => s.t > newsSeen).map(s => `Shock ${s.asset} ${s.movePct > 0 ? '+' : ''}${s.movePct}% in 3 min`),
+      ...d.items.filter(i => (i.seenAt || 0) > newsSeen && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => i.title.slice(0, 120))];
+    newsSeen = Math.max(newsSeen, latest);
+    for (const msg of fresh) {
+      toast(msg);
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('agentsIA', { body: msg });
+    }
+    if (fresh.length && current === 'news') render();
+  } catch { /* server restarting */ }
+}
+setInterval(watchNews, 30000); setTimeout(watchNews, 4000);
 
 async function refreshSettings() { settings = await api('/settings'); renderHeader(); }
 async function render(enter = false) {

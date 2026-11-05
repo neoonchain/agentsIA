@@ -46,6 +46,18 @@ export async function getCandles(asset, limit = 48) {
   return v.slice(-limit);
 }
 
+/** 1-minute candles, oldest first (Coinbase, Kraken fallback). Used by the shock detector. */
+export async function getCandles1m(asset, limit = 61) {
+  if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
+  if (mock) return (mock.candles1m?.[asset] || []).slice(-limit);
+  let v;
+  try {
+    const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=60`);
+    v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
+  } catch { v = await K.ohlc(asset, 1); }
+  return v.slice(-limit);
+}
+
 export function candleSummary(c) {
   if (!c.length) return 'No candle data.';
   const hi = Math.max(...c.map(x => x.high)), lo = Math.min(...c.map(x => x.low));

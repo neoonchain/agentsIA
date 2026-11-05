@@ -1,5 +1,6 @@
 // Local server: serves the landing page, the app and a JSON API. Binds to 127.0.0.1 only.
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +31,17 @@ export function createServer(app = new App()) {
       res.end(type === 'application/json' ? JSON.stringify(body) : body);
     };
     try {
+      // Inbound news webhook: may come through a tunnel (any Host), so it is authorised by its own token instead.
+      if (req.method === 'POST' && req.url.split('?')[0] === '/api/news/webhook') {
+        const given = String(req.headers['x-agentsia-token'] || new URL(req.url, 'http://x').searchParams.get('token') || '');
+        const want = app.config.news.webhookToken;
+        const ok = given.length === want.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(want));
+        if (!ok) return send(401, { error: 'Bad or missing token' });
+        const body = await readBody(req);
+        const items = Array.isArray(body) ? body.slice(0, 20) : [body];
+        const added = items.map(it => app.addNews(it, 'webhook')).filter(Boolean);
+        return send(200, { ok: true, added: added.length });
+      }
       // Reject DNS-rebinding: only accept requests addressed to this machine.
       const host = String(req.headers.host || '').replace(/:\d+$/, '');
       if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) return send(403, { error: 'Forbidden host' });
@@ -63,7 +75,10 @@ export async function start({ port = Number(process.env.PORT) || 4317, tickMs = 
   await new Promise((ok, ko) => { server.once('error', ko); server.listen(port, '127.0.0.1', ok); });
   let busy = false;
   const timer = setInterval(async () => { if (busy) return; busy = true; try { await app.tick(); } finally { busy = false; } }, tickMs);
-  server.on('close', () => clearInterval(timer));
+  let newsBusy = false;
+  const newsTimer = setInterval(async () => { if (newsBusy) return; newsBusy = true; try { await app.newsTick(); } catch (e) { console.error('news', e.message); } finally { newsBusy = false; } }, 30000);
+  setTimeout(() => app.newsTick().catch(() => {}), 1500);
+  server.on('close', () => { clearInterval(timer); clearInterval(newsTimer); });
   const addr = server.address();
   console.log(`agentsIA running at http://localhost:${addr.port}/app  ·  vault: ${app.vault}`);
   return { server, app, port: addr.port };

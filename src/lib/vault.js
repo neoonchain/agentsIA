@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from './frontmatter.js';
 
-export const DIRS = ['Trades', 'Strategies', 'Psychology', 'Agents', 'Insights', 'Log', 'Templates', 'Attachments', 'Lessons'];
+export const DIRS = ['Trades', 'Strategies', 'Psychology', 'Agents', 'Insights', 'Log', 'Templates', 'Attachments', 'Lessons', 'News'];
 
 /* ---------- images (trade screenshots) ---------- */
 export const IMAGE_EXT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
@@ -78,6 +78,9 @@ slippage_pct: 0.05
 first_tier_usd: 250
 min_24h_volume_usd: 1000000
 max_spread_pct: 0.5
+shock_guard_min: 15
+shock_major_pct: 1.2
+shock_meme_pct: 3
 ---
 
 # Marks and limits
@@ -111,6 +114,32 @@ interval_min: 60
 Works best during European hours. Big losses come from entering before the candle closes.
 `;
 
+const MEME = `---
+name: Memecoin momentum
+status: stopped
+assets: [DOGE-USD, PEPE-USD, WIF-USD, BONK-USD, SHIB-USD]
+timeframe: 1h
+risk_per_trade_pct: 0.5
+hours_utc: "00:00-23:59"
+interval_min: 30
+on_shock: allow
+---
+
+# Memecoin momentum
+
+Memecoins move on attention. This strategy only trades coins Kraken lists against USD, never tokens that live only on a DEX (pump.fun and similar).
+
+## Rules
+- Enter only with a catalyst: a fresh headline or tweet about the coin (news feed) AND a price shock with volume of at least 3x average.
+- Do not enter if the coin is already up more than 8% from where the catalyst started: that is chasing.
+- Stop below the level where the move started (usually 4-8% away); target 3R; risk 0.5% (half the usual).
+- Close after 6 hours if the target has not been reached: memecoin moves fade.
+- Never more than one memecoin position at a time.
+
+## Why the risk is smaller
+Spreads widen and volume vanishes fast. Brake also checks Kraken's 24h volume and spread before any real-money buy.
+`;
+
 const TILT = `---
 tags: [psychology, rules]
 ---
@@ -139,6 +168,7 @@ export function initVault(root) {
     ['Templates/Trade.md', TEMPLATE_TRADE],
     ['Strategies/Range breakout.md', STRATEGY],
     ['Psychology/Anti-tilt rules.md', TILT],
+    ['Strategies/Memecoin momentum.md', MEME],
   ];
   for (const [rel, content] of seed) {
     const f = path.join(root, rel);

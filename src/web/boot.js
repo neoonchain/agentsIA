@@ -81,6 +81,9 @@ async function boot() {
   // Paper trading: same scheduler as the desktop app, while this tab is open.
   let busy = false;
   setInterval(async () => { if (busy) return; busy = true; try { await app.tick(); } finally { busy = false; } }, 60000);
+  let newsBusy = false;
+  setInterval(async () => { if (newsBusy) return; newsBusy = true; try { await app.newsTick(); } finally { newsBusy = false; } }, 30000);
+  setTimeout(() => app.newsTick().catch(() => {}), 1500);
   addEventListener('pagehide', () => { vfs.flushAll(); });
   addEventListener('beforeunload', e => { if (vfs.pending()) { vfs.flushAll(); e.preventDefault(); } });
 

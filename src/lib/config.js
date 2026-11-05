@@ -38,6 +38,8 @@ const DEFAULTS = {
   roles: { lead: 'opus', psychology: 'fable', scribe: 'sonnet', reviewer: 'gpt', charts: 'astra', context: 'gemini', sentiment: 'grok' },
   enabledRoles: { lead: true, psychology: true, scribe: true, reviewer: true, charts: true, context: false, sentiment: false },
   webSearch: false,
+  news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '' },
+  xBearer: '',
   freeRemaining: null,     // last value reported by the free-trial proxy
   installId: '',
 };
@@ -55,6 +57,8 @@ export function loadConfig() {
   c.roles = { ...DEFAULTS.roles, ...(saved.roles || {}) };
   c.enabledRoles = { ...DEFAULTS.enabledRoles, ...(saved.enabledRoles || {}) };
   if (process.env.AGENTSIA_VAULT) c.vaultPath = process.env.AGENTSIA_VAULT;
+  c.news = { ...DEFAULTS.news, ...(saved.news || {}) };
+  if (!c.news.webhookToken) c.news.webhookToken = crypto.randomUUID().replace(/-/g, '');
   if (!c.installId) { c.installId = crypto.randomUUID(); try { saveConfig(c); } catch { /* read-only home: id stays per session */ } }
   return c;
 }
@@ -84,8 +88,9 @@ export function updateConfig(c, patch) {
 }
 
 export function publicConfig(c) {
-  const { apiKey, installId, kraken, ...rest } = c;
+  const { apiKey, installId, kraken, xBearer, ...rest } = c;
+  rest.news = { ...c.news, webhookToken: undefined };
   const left = c.freeRemaining ?? FREE_LIMIT;
   return { ...rest, hasApiKey: !!apiKey, apiKeyHint: apiKey ? '…' + apiKey.slice(-4) : '', freeLimit: FREE_LIMIT, freeUsed: Math.max(FREE_LIMIT - left, 0),
-    freeAvailable: !!freeProxyUrl(c), web: !!globalThis.AGENTSIA_WEB, vaultLabel: globalThis.AGENTSIA_VAULT_LABEL || c.vaultPath, hasKraken: !!kraken, krakenHint: kraken ? '…' + kraken.key.slice(-4) : '', krakenCheckedAt: kraken?.checkedAt || null, catalog: { models: MODELS, roles: ROLES } };
+    freeAvailable: !!freeProxyUrl(c), hasXBearer: !!xBearer, web: !!globalThis.AGENTSIA_WEB, vaultLabel: globalThis.AGENTSIA_VAULT_LABEL || c.vaultPath, hasKraken: !!kraken, krakenHint: kraken ? '…' + kraken.key.slice(-4) : '', krakenCheckedAt: kraken?.checkedAt || null, catalog: { models: MODELS, roles: ROLES } };
 }

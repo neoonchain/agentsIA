@@ -8,6 +8,8 @@ import { getPrice, getCandles, candleSummary, validAsset } from './market.js';
 import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
 import * as K from './kraken.js';
 import * as L from './live.js';
+import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf } from './news.js';
+import { getCandles1m } from './market.js';
 const px = L.fmtPx;
 
 const BASE = `You are part of agentsIA, a trading-journal assistant working from the user's own Obsidian vault.
@@ -19,6 +21,9 @@ export class App {
     this.config = loadConfig();
     this.locks = new Set();
     this.activity = [];
+    this.news = new NewsHub();
+    this.shockUntil = {};
+    this.newsAt = {};
     this.openVault();
   }
 
@@ -208,6 +213,10 @@ export class App {
         const where = live ? 'REAL-MONEY (Kraken spot: long only, no shorting, no leverage)' : 'paper';
         const ctxParts = [`Strategy note [[${s.name}]]:\n${s.body}`, `Strategy settings: assets ${s.assets.join(', ')}, hours ${s.hours_utc || 'any'} UTC, max risk ${Math.min(Number(s.risk_per_trade_pct) || 1, Number(rules.max_risk_per_trade_pct) || 2)}% per trade.`,
           `Open ${where} positions: ${positions}`, `${live ? 'Real allocation' : 'Paper'} equity ${T.equity(acc, prices).toFixed(2)} (start ${acc.startBalance}). Current UTC time ${new Date().toISOString()}.`];
+        const heads = this.news.relevant(s.assets, 6 * 3600000, 8);
+        if (heads.length) ctxParts.push(`Latest news about these assets (newest first; check timing against the candles, headlines can be stale or wrong):\n${heads.map(h => `- ${new Date(h.time).toISOString().slice(5, 16)} ${h.source}: ${h.title}`).join('\n')}`);
+        const shocks = this.news.recentShocks(s.assets, 3 * 3600000);
+        if (shocks.length) ctxParts.push(`Price shocks in the last 3h: ${shocks.map(x => `${x.asset} ${x.movePct > 0 ? '+' : ''}${x.movePct}% in 3 min, volume ${x.volX}x at ${new Date(x.t).toISOString().slice(11, 16)} UTC`).join('; ')}.`);
         const lessons = this.lessonsText(s.name, 6);
         if (lessons) ctxParts.push(`Lessons from this strategy's previous trades, written after each one closed. Apply them:\n${lessons}`);
         if (live) ctxParts.push('This strategy trades REAL money on Kraken: only "long" opens are possible. Prefer "hold" when the setup is not clean.');
@@ -238,6 +247,10 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
         let verdict = (p.action === 'open' && typeof price !== 'number')
           ? { ok: false, reasons: [`${p.asset} is not in the strategy`], offStrategy: true }
           : T.brake(p, { strategy: s, rules, acc, price, mode: this.config.mode, reviewerAgreed });
+        const guard = this.shockUntil[p.asset];
+        if (p.action === 'open' && verdict.ok && guard && guard.until > Date.now() && s.on_shock !== 'allow') {
+          verdict = { ok: false, reasons: [`Shock guard: ${p.asset} moved ${guard.movePct > 0 ? '+' : ''}${guard.movePct}% in 3 min; no new entries until ${new Date(guard.until).toISOString().slice(11, 16)} UTC`], offStrategy: false };
+        }
         if (live && p.action === 'open' && verdict.ok) {
           const extra = L.liveChecks(p, await K.ticker(p.asset), rules);
           if (extra.length) verdict = { ok: false, reasons: extra, offStrategy: p.side !== 'long' };
@@ -301,6 +314,56 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     }
     this.note(`[[${s.name}]] closed ${t.asset} by ${t.reason} · ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R)`);
     this.learn(s, t);
+  }
+
+  /* ---------- news & shocks: polled every 30 s by the server (or the web app's tab) ---------- */
+  watchedAssets() {
+    const running = this.strategies().filter(s => s.status === 'running' || this.liveOf(s.name)).flatMap(s => s.assets);
+    return [...new Set([...(this.config.news.watch || []), ...running])];
+  }
+  addNews(item, source = 'webhook') {
+    const title = String(item?.title || item?.text || '').trim();
+    if (!title) throw Object.assign(new Error('A news item needs a title or text'), { status: 400 });
+    const fresh = this.news.ingest([{ id: `${source}:${item.id || Date.now() + ':' + title.slice(0, 40)}`, time: Date.parse(item.time) || Date.now(), title: title.slice(0, 400), url: String(item.url || ''), source: String(item.source || source).slice(0, 60), tags: [].concat(item.coins || item.coin || []) }]);
+    for (const n of fresh) this.recordNews(n);
+    return fresh[0] || null;
+  }
+  recordNews(n) {
+    const watch = new Set(this.watchedAssets().map(baseOf));
+    if (!n.coins.some(c => watch.has(c))) return;
+    V.appendLog(this.vault, `news · ${n.source} · ${n.coins.join(', ')} · ${n.title.slice(0, 160)}`);
+  }
+  async newsTick(now = Date.now()) {
+    const due = (k, ms) => !this.newsAt[k] || now - this.newsAt[k] >= ms;
+    const cfg = this.config.news, jobs = [];
+    if (cfg.tree && due('tree', 25000)) { this.newsAt.tree = now; jobs.push(this.news.poll('Tree of Alpha', () => NEWS.tree())); }
+    if (cfg.rss && !globalThis.AGENTSIA_WEB && due('rss', 120000)) { this.newsAt.rss = now; for (const u of DEFAULT_RSS) jobs.push(this.news.poll(new URL(u).hostname, () => NEWS.rss(u))); }
+    if (cfg.x && this.config.xBearer && due('x', 60000)) { this.newsAt.x = now; jobs.push(this.news.poll('X API', () => NEWS.x(this.config.xBearer, cfg.xQuery))); }
+    for (const fresh of await Promise.all(jobs)) for (const n of fresh) this.recordNews(n);
+    // shocks on every watched asset
+    const rules = this.rules(), triggered = [];
+    for (const asset of this.watchedAssets()) {
+      let c; try { c = await getCandles1m(asset, 61); } catch { continue; }
+      const sh = detectShock(asset, c, { majorPct: Number(rules.shock_major_pct) || 1.2, memePct: Number(rules.shock_meme_pct) || 3 });
+      if (!sh?.shock) continue;
+      const prev = this.news.shocks.find(x => x.asset === asset);
+      if (prev && sh.t - prev.t < 10 * 60000) continue; // one alert per move
+      this.news.shocks.unshift(sh); this.news.shocks.length = Math.min(this.news.shocks.length, 100);
+      this.shockUntil[asset] = { until: now + (Number(rules.shock_guard_min) || 15) * 60000, movePct: sh.movePct };
+      const heads = this.news.relevant([asset], 30 * 60000, 2).map(h => h.title.slice(0, 90));
+      this.note(`SHOCK ${asset} ${sh.movePct > 0 ? '+' : ''}${sh.movePct}% in 3 min (volume ${sh.volX}x)${heads.length ? ' · news: ' + heads.join(' | ') : ' · no headline yet'}`);
+      triggered.push(sh);
+    }
+    // react now instead of waiting for each strategy's interval
+    const out = [];
+    if (triggered.length && this.config.apiKey) {
+      const hit = new Set(triggered.map(x => x.asset));
+      for (const s of this.strategies().filter(x => (x.status === 'running' || this.liveOf(x.name)) && x.assets.some(a => hit.has(a)))) {
+        if (this.locks.has(s.name)) continue;
+        try { out.push({ name: s.name, ...(await this.decide(s.name)) }); } catch (e) { this.note(`[[${s.name}]] shock decision failed · ${e.message}`); }
+      }
+    }
+    return { shocks: triggered, decisions: out };
   }
 
   /* ---------- learning loop: every closed trade leaves a lesson the next decisions read ---------- */
