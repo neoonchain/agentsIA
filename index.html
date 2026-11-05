@@ -291,6 +291,30 @@ html.lenis,html.lenis body{height:auto}
 #loader .ltag{position:absolute;right:var(--gutter);bottom:clamp(26px,5vh,52px);font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:rgba(255,255,255,.55);text-align:right;line-height:1.9}
 #loader .ltag b{color:var(--sky);font-weight:400}
 html.loading{overflow:hidden}
+/* scroll-linked effects */
+main{position:relative;overflow-x:clip}
+main>section,main>div{position:relative;z-index:1}
+#scrollLine{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
+#scrollLine path{fill:none;opacity:.7;stroke:var(--sky);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+.hero{will-change:clip-path}
+.tilt{transform-origin:50% 0;will-change:transform,opacity}
+#reel{height:230vh;position:relative}
+#reel .stick{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;place-items:center}
+#reel .word{position:absolute;top:50%;font-size:clamp(64px,13vw,210px);font-weight:300;letter-spacing:-.05em;line-height:1;transform:translateY(-50%);white-space:nowrap;will-change:transform;z-index:2;color:var(--ink)}
+#reel .word.l{right:50%;margin-right:clamp(80px,14vw,220px)}
+#reel .word.r{left:50%;margin-left:clamp(80px,14vw,220px)}
+#reel .card{position:relative;width:24vw;height:20vh;border-radius:28px;overflow:hidden;background:var(--ink);will-change:width,height,border-radius;z-index:1}
+#reel .card canvas{position:absolute;inset:0;width:100%;height:100%}
+#reel .card .cta{position:absolute;inset:0;background:radial-gradient(60% 55% at 50% 50%,rgba(1,5,33,.92),rgba(1,5,33,.55) 70%,rgba(1,5,33,0));display:grid;place-items:center;align-content:center;gap:14px;color:#fff;text-align:center;opacity:0;transition:opacity .6s}
+#reel .card.open .cta{opacity:1}
+#reel .card .cta p{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--sky)}
+#reel .card .cta h3{font-size:clamp(28px,3.4vw,52px);font-weight:300;letter-spacing:-.035em;line-height:1.05;max-width:16ch}
+#reel .card .cta .btn{pointer-events:auto}
+#reel .hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--mute-2)}
+#progress{position:fixed;right:14px;top:50%;width:3px;height:120px;margin-top:-60px;background:var(--line);border-radius:3px;z-index:40}
+#progress i{position:absolute;left:0;top:0;width:3px;height:28px;background:var(--ink);border-radius:3px;will-change:transform}
+@media (max-width:720px){#progress{display:none}#reel .card{width:46vw;height:16vh}#reel .word.l{margin-right:26vw}#reel .word.r{margin-left:26vw}}
+@media (prefers-reduced-motion:reduce){#reel{height:auto}#reel .stick{position:relative;height:70vh}#reel .card{width:80vw;height:50vh}#reel .card .cta{opacity:1}#scrollLine,#progress{display:none}}
 
 /* RESPONSIVE */
 @media (max-width:1280px){
@@ -441,7 +465,9 @@ try{if(!sessionStorage.getItem('agentsia-intro')&&!matchMedia('(prefers-reduced-
   </div>
 </header>
 
+<div id="progress" aria-hidden="true"><i></i></div>
 <main id="main">
+<svg id="scrollLine" aria-hidden="true"><path/></svg>
 <section class="hero" id="top">
   <canvas class="pix" id="heroPix" data-mode="hero"></canvas>
   <div class="wrap">
@@ -475,6 +501,18 @@ try{if(!sessionStorage.getItem('agentsia-intro')&&!matchMedia('(prefers-reduced-
     <div class="stat"><h5>REAL DOLLARS WITHOUT YOUR OK</h5><div class="n">0</div><p>Beating the marks only opens the door. You confirm the move to real money.</p></div>
   </div>
 </div>
+
+<!-- INTERLUDE: words pull apart, card grows -->
+<section id="reel" aria-label="Paper first">
+  <div class="stick">
+    <span class="word l">PAPER</span>
+    <div class="card"><canvas class="pix" data-mode="foot"></canvas>
+      <div class="cta"><p>PAPER FIRST · REAL MONEY LATER</p><h3>Let your agents prove it before they touch a dollar.</h3><a class="btn dark" href="/app">Open the app <span class="arr">↗</span></a></div>
+    </div>
+    <span class="word r">FIRST</span>
+    <span class="hint">SCROLL</span>
+  </div>
+</section>
 
 <!-- 02 VAULT -->
 <section class="sec" id="vault"><div class="wrap">
@@ -928,21 +966,87 @@ document.querySelectorAll('.reveal,#howgrid').forEach(el=>{if(el.id==='howgrid')
 (() => {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root = document.documentElement;
-  /* ---------- smooth, slightly inertial scroll ---------- */
-  let lenis = null;
-  if (!reduce && window.Lenis) {
-    lenis = new Lenis({ duration: 1.15, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)), anchors: { offset: -68 } });
-    const raf = t => { lenis.raf(t); requestAnimationFrame(raf); }; requestAnimationFrame(raf);
-  }
-  /* ---------- hero parallax ---------- */
+  /* ---------- scroll-linked effects (lusion-style) ---------- */
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  const vh = () => innerHeight;
   const hero = document.querySelector('.hero'), heroWrap = hero.querySelector('.wrap'), pix = hero.querySelector('.pix');
-  const onScroll = y => {
-    if (y > innerHeight * 1.2) return;
-    pix.style.transform = `translate3d(0,${y * 0.35}px,0)`;
-    heroWrap.style.transform = `translate3d(0,${y * 0.18}px,0)`;
-    heroWrap.style.opacity = String(Math.max(0, 1 - y / (innerHeight * 0.85)));
-  };
-  if (!reduce) { if (lenis) lenis.on('scroll', e => onScroll(e.scroll)); else addEventListener('scroll', () => onScroll(scrollY), { passive: true }); }
+  const prog = (el, start = 1, span = 1) => { const r = el.getBoundingClientRect(); return clamp((vh() * start - r.top) / (vh() * span)); };
+  // blocks that lie back in 3D and flatten as they arrive
+  const tilts = [...document.querySelectorAll('.term, .vault, .flow, .steps-box')];
+  tilts.forEach(el => { el.classList.remove('reveal'); el.classList.add('tilt'); });
+  // columns that travel at different speeds
+  const cols = [...document.querySelectorAll('.how > div')];
+  // rule drawings zoom out as they enter
+  const zooms = [...document.querySelectorAll('.rule .vis svg')];
+  // the line drawn by scrolling
+  const main = document.getElementById('main'), svg = document.getElementById('scrollLine'), path = svg.querySelector('path');
+  let lineLen = 0, lineTop = 0, lineH = 0;
+  function buildLine() {
+    const W = main.clientWidth, top = hero.offsetHeight + 80, H = main.scrollHeight;
+    const secs = [...main.querySelectorAll(':scope > section.sec, :scope > #reel')].map(x => x.offsetTop);
+    const ys = [top, ...secs.filter(y => y > top + 200), H - 120];
+    let d = `M ${W * 0.06} ${ys[0]}`;
+    for (let i = 1; i < ys.length; i++) {
+      const x0 = i % 2 ? W * 0.06 : W * 0.94, x1 = i % 2 ? W * 0.94 : W * 0.06, y0 = ys[i - 1], y1 = ys[i], m = (y1 - y0) * 0.55;
+      d += ` C ${x0} ${y0 + m}, ${x1} ${y1 - m}, ${x1} ${y1}`;
+    }
+    svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    path.setAttribute('d', d);
+    lineLen = path.getTotalLength(); lineTop = top; lineH = H - top;
+    path.style.strokeDasharray = lineLen;
+  }
+  const reel = document.getElementById('reel'), card = reel.querySelector('.card'), wl = reel.querySelector('.word.l'), wr = reel.querySelector('.word.r'), hint = reel.querySelector('.hint');
+  const thumb = document.querySelector('#progress i');
+  function frame(y) {
+    const H = vh();
+    // hero: shrinks into a rounded card, content drifts and fades
+    if (y < H * 1.3) {
+      const p = clamp(y / H);
+      hero.style.clipPath = `inset(${p * 26}px ${p * 34}px 0 ${p * 34}px round ${p * 30}px)`;
+      pix.style.transform = `translate3d(0,${y * 0.35}px,0) scale(${1 - p * 0.06})`;
+      heroWrap.style.transform = `translate3d(0,${y * 0.18}px,0)`;
+      heroWrap.style.opacity = String(Math.max(0, 1 - y / (H * 0.85)));
+    }
+    // line drawn with scroll
+    if (lineLen) path.style.strokeDashoffset = String(lineLen * (1 - clamp((y + H * 0.7 - lineTop) / lineH)));
+    // tilted blocks flatten
+    for (const el of tilts) {
+      const p = ease(prog(el, 1.0, 0.75));
+      el.style.transform = `perspective(1400px) rotateX(${(1 - p) * 24}deg) scale(${0.9 + p * 0.1}) translateY(${(1 - p) * 60}px)`;
+      el.style.opacity = String(clamp(p * 1.6));
+    }
+    cols.forEach((el, i) => { const p = prog(el, 1, 1.4); el.style.transform = `translate3d(0,${(0.5 - p) * (i % 2 ? 90 : 30)}px,0)`; });
+    zooms.forEach(el => { el.style.transform = `scale(${1.18 - ease(prog(el, 1, 0.8)) * 0.18})`; });
+    // PAPER ··· FIRST: words pull apart, card grows to fill the screen
+    const r = reel.getBoundingClientRect();
+    const q = clamp(-r.top / (reel.offsetHeight - H)), e = ease(q);
+    const W = innerWidth, small = W < 720;
+    card.style.width = `${(small ? 46 : 24) + e * ((small ? 92 : 94) - (small ? 46 : 24))}vw`;
+    card.style.height = `${(small ? 16 : 20) + e * (78 - (small ? 16 : 20))}vh`;
+    card.style.borderRadius = `${28 - e * 10}px`;
+    wl.style.transform = `translate(${-e * 40}vw,-50%)`; wr.style.transform = `translate(${e * 40}vw,-50%)`;
+    wl.style.opacity = wr.style.opacity = String(1 - clamp((q - 0.55) / 0.3));
+    hint.style.opacity = String(1 - clamp(q * 4));
+    card.classList.toggle('open', q > 0.62);
+    // side indicator
+    const max = document.documentElement.scrollHeight - H;
+    thumb.style.transform = `translateY(${clamp(y / max) * 92}px)`;
+  }
+  let lenis = null;
+  if (!reduce) {
+    if (window.Lenis) {
+      lenis = new Lenis({ duration: 1.15, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)), anchors: { offset: -68 } });
+      const raf = t => { lenis.raf(t); requestAnimationFrame(raf); }; requestAnimationFrame(raf);
+      lenis.on('scroll', e => frame(e.scroll));
+    } else addEventListener('scroll', () => frame(scrollY), { passive: true });
+    const rebuild = () => { buildLine(); frame(scrollY); };
+    addEventListener('resize', rebuild);
+    addEventListener('load', rebuild);
+    document.fonts?.ready.then(rebuild);
+    new ResizeObserver(() => { clearTimeout(rebuild.t); rebuild.t = setTimeout(rebuild, 150); }).observe(main);
+    rebuild();
+  }
   /* ---------- section headings rise word by word ---------- */
   document.querySelectorAll('.sec-head h2, .tok h2').forEach(h => {
     let i = 0;
@@ -996,8 +1100,18 @@ document.querySelectorAll('.reveal,#howgrid').forEach(el=>{if(el.id==='howgrid')
     if (shown >= 100) {
       setTimeout(() => {
         L.classList.add('break');
-        setTimeout(() => { L.classList.add('out'); done(); try { sessionStorage.setItem('agentsia-intro', '1'); } catch (e) {} }, 420);
-        setTimeout(() => L.remove(), 1700);
+        setTimeout(() => {
+          done(); try { sessionStorage.setItem('agentsia-intro', '1'); } catch (e) {}
+          // a diamond opens from the centre, leaving dark corners that slide away (lusion's cut)
+          const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2, max = (W + H) / 2 + 40, t1 = performance.now();
+          const io = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+          const tick = now => {
+            const t = clamp((now - t1) / 1150), r = io(t) * max;
+            L.style.clipPath = `path(evenodd, 'M0 0H${W}V${H}H0Z M${cx} ${cy - r}L${cx + r} ${cy}L${cx} ${cy + r}L${cx - r} ${cy}Z')`;
+            if (t < 1) requestAnimationFrame(tick); else L.remove();
+          };
+          L.style.transition = 'none'; requestAnimationFrame(tick);
+        }, 420);
       }, 380);
       return;
     }
