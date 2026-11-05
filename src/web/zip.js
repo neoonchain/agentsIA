@@ -6,7 +6,7 @@ export function zip(files) {
   const enc = new TextEncoder(), parts = [], central = [];
   let offset = 0;
   for (const [name, content] of Object.entries(files)) {
-    const n = enc.encode(name), d = enc.encode(content), crc = crc32(d);
+    const n = enc.encode(name), d = content instanceof Uint8Array ? content : enc.encode(content), crc = crc32(d);
     const local = new DataView(new ArrayBuffer(30));
     local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(6, 0x0800, true); // UTF-8 names
     local.setUint32(14, crc, true); local.setUint32(18, d.length, true); local.setUint32(22, d.length, true); local.setUint16(26, n.length, true);

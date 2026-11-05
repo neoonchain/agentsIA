@@ -9,6 +9,23 @@ const ago = iso => { const s = (Date.now() - Date.parse(iso)) / 1000; return s <
 const agoText = iso => { const a = ago(iso); return a === 'now' ? 'just now' : a + ' ago'; };
 
 let settings = null, current = 'overview', selected = null;
+const imgCache = new Map();
+async function imageUrl(path) {
+  if (!imgCache.has(path)) imgCache.set(path, api('/image?path=' + encodeURIComponent(path)).then(r => r.dataUrl));
+  return imgCache.get(path);
+}
+/** Downscale to 1600px and re-encode, so screenshots stay light in the vault. */
+async function compressImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = url; });
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const webp = c.toDataURL('image/webp', 0.86);
+    return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/jpeg', 0.86);
+  } finally { URL.revokeObjectURL(url); }
+}
 
 async function api(path, opts = {}) {
   if (window.__agentsiaApi) { // web version: the engine runs in this tab
@@ -55,7 +72,8 @@ async function openNote(path) {
   try {
     const n = await api('/note?path=' + encodeURIComponent(path));
     $('#dlgTitle').textContent = path;
-    $('#dlgBody').innerHTML = `<dl class="fm">${Object.entries(n.data).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(Array.isArray(v) ? v.join(', ') : v)}</dd>`).join('')}</dl>${md(n.body)}`;
+    $('#dlgBody').innerHTML = `${n.data.image ? '<img class="dlg-shot" alt="Trade screenshot">' : ''}<dl class="fm">${Object.entries(n.data).filter(([k]) => k !== 'image').map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(Array.isArray(v) ? v.join(', ') : v)}</dd>`).join('')}</dl>${md(n.body.replace(/!\[\[[^\]]+\]\]\n*/g, ''))}`;
+    if (n.data.image) imageUrl(String(n.data.image)).then(u => { const im = $('#dlgBody .dlg-shot'); if (im) im.src = u; }).catch(() => $('#dlgBody .dlg-shot')?.remove());
     $('#dlg').showModal();
   } catch (e) { fail(e); }
 }
@@ -104,32 +122,95 @@ const views = {
 
   async journal() {
     const trades = await api('/journal');
+    const filt = views.journal.filter || 'all';
+    const sum = (a, f) => a.reduce((x, t) => x + f(t), 0);
+    const wins = trades.filter(t => t.pnl > 0), losses = trades.filter(t => t.pnl < 0);
+    const gp = sum(wins, t => t.pnl), gl = -sum(losses, t => t.pnl), rs = trades.map(t => t.r).filter(r => typeof r === 'number');
+    const pf = gl > 0 ? (gp / gl).toFixed(2) : gp > 0 ? '∞' : '–';
+    // cumulative PnL curve
+    let acc = 0; const pts = [0, ...trades.map(t => (acc += t.pnl))];
+    const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1, W = 560, H = 120;
+    const xy = pts.map((v, k) => [pts.length > 1 ? (k / (pts.length - 1)) * W : 0, H - 8 - ((v - lo) / span) * (H - 16)]);
+    const line = xy.map(([x, y], k) => `${k ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+    const zeroY = H - 8 - ((0 - lo) / span) * (H - 16);
+    const shown = trades.slice().reverse().filter(t => filt === 'all' || (filt === 'wins' ? t.pnl > 0 : filt === 'losses' ? t.pnl < 0 : !!t.image));
     view.innerHTML = `
-      <div class="head"><div><h1>Journal</h1><p>Every trade becomes a note in <span class="mono">Trades/</span>. Edit them freely in Obsidian; this list reads them back.</p></div></div>
-      <form class="card soft form" id="tradeForm">
-        <label>Date<input name="date" type="datetime-local" required></label>
-        <label>Asset<input name="asset" placeholder="BTC-USD" required></label>
-        <label>Side<select name="side"><option>long</option><option>short</option></select></label>
-        <label>Strategy<input name="strategy" placeholder="Range breakout"></label>
-        <label>Entry<input name="entry" type="number" step="any" required></label>
-        <label>Stop<input name="stop" type="number" step="any"></label>
-        <label>Exit<input name="exit" type="number" step="any"></label>
-        <label>Size (units)<input name="size" type="number" step="any"></label>
-        <label>PnL (USD, optional)<input name="pnl" type="number" step="any" placeholder="computed from size"></label>
-        <label>Emotion<input name="emotion" placeholder="calm · confidence 7/10"></label>
-        <label class="w2">Tags<input name="tags" placeholder="breakout, followed-plan"></label>
-        <label class="w2">Thesis<textarea name="thesis"></textarea></label>
-        <label class="w2">Psychology<textarea name="psychology"></textarea></label>
-        <label class="w2">Went well<textarea name="wentWell" placeholder="- "></textarea></label>
-        <label class="w2">Went wrong<textarea name="wentWrong" placeholder="- "></textarea></label>
-        <div class="w4 row"><button class="btn dark" data-busy="Saving">Save trade note</button><span class="sub">R is computed from entry, stop and exit.</span></div>
+      <div class="head"><div><h1>Journal</h1><p>Every trade is a note in <span class="mono">Trades/</span> with its screenshot in <span class="mono">Attachments/</span>. Obsidian shows both; Analyse lets the models look at your charts.</p></div>
+        <button class="btn dark" id="newTrade">${trades.length ? 'Log a trade' : 'Log your first trade'}</button></div>
+      <div class="jstats">
+        <div class="jcurve card"><div class="row" style="justify-content:space-between"><span class="eyebrow">Cumulative PnL</span><span class="num ${cls(acc)}">${money(acc)}</span></div>
+          ${trades.length > 1 ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="jg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${acc >= 0 ? '#0055ff' : '#ef4423'}" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+            <line x1="0" x2="${W}" y1="${zeroY}" y2="${zeroY}" stroke="#d3d6de" stroke-dasharray="3 4"/><path d="${line} L${W} ${H} L0 ${H}Z" fill="url(#jg)"/><path d="${line}" fill="none" stroke="${acc >= 0 ? '#0055ff' : '#ef4423'}" stroke-width="2.2" vector-effect="non-scaling-stroke"/></svg>`
+            : '<p class="empty">The curve appears after two trades.</p>'}</div>
+        <div class="jnums">
+          <div class="card stat"><span class="eyebrow">Trades</span><div class="n">${trades.length}</div></div>
+          <div class="card stat"><span class="eyebrow">Win rate</span><div class="n">${trades.length ? Math.round((wins.length / trades.length) * 100) : 0}%</div></div>
+          <div class="card stat"><span class="eyebrow">Profit factor</span><div class="n">${pf}</div></div>
+          <div class="card stat"><span class="eyebrow">Avg R</span><div class="n ${cls(rs.length ? sum(rs, r => r) : 0)}">${rs.length ? (sum(rs, r => r) / rs.length).toFixed(2) : '–'}</div></div>
+        </div>
+      </div>
+      <form class="card soft jform" id="tradeForm" ${trades.length ? 'hidden' : ''}>
+        <label class="drop" id="drop" tabindex="0"><input type="file" accept="image/*" id="shot" hidden>
+          <div class="drop-empty"><b>Chart screenshot</b><span>Paste (Ctrl/⌘ V), drop an image here, or click to choose</span></div>
+          <img id="shotPrev" alt="" hidden><button type="button" class="x" id="shotClear" hidden aria-label="Remove screenshot">×</button></label>
+        <div class="form">
+          <label>Date<input name="date" type="datetime-local" required></label>
+          <label>Asset<input name="asset" placeholder="BTC-USD" required></label>
+          <label>Side<select name="side"><option>long</option><option>short</option></select></label>
+          <label>Strategy<input name="strategy" placeholder="Range breakout"></label>
+          <label>Entry<input name="entry" type="number" step="any" required></label>
+          <label>Stop<input name="stop" type="number" step="any"></label>
+          <label>Exit<input name="exit" type="number" step="any"></label>
+          <label>Size (units)<input name="size" type="number" step="any"></label>
+          <label>PnL (USD, optional)<input name="pnl" type="number" step="any" placeholder="computed from size"></label>
+          <label>Emotion<input name="emotion" placeholder="calm · confidence 7/10"></label>
+          <label class="w2">Tags<input name="tags" placeholder="breakout, followed-plan"></label>
+          <label class="w2">Thesis<textarea name="thesis"></textarea></label>
+          <label class="w2">Psychology<textarea name="psychology"></textarea></label>
+          <label class="w2">Went well<textarea name="wentWell" placeholder="- "></textarea></label>
+          <label class="w2">Went wrong<textarea name="wentWrong" placeholder="- "></textarea></label>
+          <div class="w4 row"><button class="btn dark" data-busy="Saving">Save trade note</button><button type="button" class="btn" id="cancelTrade">Cancel</button><span class="sub">R is computed from entry, stop and exit.</span></div>
+        </div>
       </form>
-      <div class="tblwrap" style="margin-top:24px">${trades.length ? `<table><tr><th>Date</th><th>Asset</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>R</th><th>Strategy</th><th>Tags</th></tr>
-        ${trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.path)}"><td class="num">${esc(t.date)}</td><td>${esc(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${t.entry ?? ''}</td><td class="num">${t.exit ?? ''}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r ?? '–'}</td><td>${esc(t.strategy)}</td><td>${t.tags.map(x => `<span class="chip">#${esc(x)}</span>`).join(' ')}</td></tr>`).join('')}</table>` : '<p class="empty">No trades logged yet. Add your first one above.</p>'}</div>`;
+      ${trades.length ? `<div class="row jfilter" id="jfilter">${[['all', 'All'], ['wins', `Wins · ${wins.length}`], ['losses', `Losses · ${losses.length}`], ['shots', 'With screenshot']].map(([k, l]) => `<button class="chipbtn ${filt === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>` : ''}
+      <div class="jgrid">${shown.map(t => `
+        <article class="jcard ${t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : ''}" data-note="${esc(t.path)}">
+          <div class="jthumb" ${t.image ? `data-img="${esc(t.image)}"` : ''}>${t.image ? '' : `<span class="jph">${esc(t.asset.split('-')[0] || '—')}</span>`}
+            <span class="jside ${t.side}">${esc(t.side)}</span></div>
+          <div class="jbody">
+            <div class="row" style="justify-content:space-between"><b>${esc(t.asset)}</b><span class="num ${cls(t.pnl)}">${money(t.pnl)}${t.r != null ? ` · ${t.r > 0 ? '+' : ''}${t.r}R` : ''}</span></div>
+            <p class="sub">${esc(t.date)}${t.strategy ? ` · ${esc(t.strategy)}` : ''}</p>
+            ${t.thesis ? `<p class="jthesis">${esc(t.thesis.slice(0, 120))}${t.thesis.length > 120 ? '…' : ''}</p>` : ''}
+            <div class="row" style="gap:6px">${t.emotion ? `<span class="chip">${esc(t.emotion.slice(0, 28))}</span>` : ''}${t.tags.slice(0, 3).map(x => `<span class="chip">#${esc(x)}</span>`).join('')}</div>
+          </div>
+        </article>`).join('') || (trades.length ? '<p class="empty">No trades match this filter.</p>' : '')}</div>`;
+
+    // thumbnails load after the grid is on screen
+    view.querySelectorAll('.jthumb[data-img]').forEach(async el => { try { el.style.backgroundImage = `url("${await imageUrl(el.dataset.img)}")`; el.classList.add('has'); } catch { /* moved or deleted */ } });
     const f = $('#tradeForm');
     f.date.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    f.onsubmit = e => { e.preventDefault(); busy(f.querySelector('button'), async () => {
+    $('#newTrade').onclick = () => { f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); f.asset.focus(); };
+    $('#cancelTrade').onclick = () => { f.hidden = true; };
+    if ($('#jfilter')) $('#jfilter').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { views.journal.filter = b.dataset.f; render(); } };
+    // screenshot: click, drop or paste; compressed in the browser before upload
+    let shot = null;
+    const setShot = async file => {
+      if (!file || !file.type.startsWith('image/')) return toast('That is not an image', true);
+      try { shot = await compressImage(file); $('#shotPrev').src = shot; $('#shotPrev').hidden = false; $('#shotClear').hidden = false; $('#drop').classList.add('filled'); }
+      catch { toast('Could not read that image', true); }
+    };
+    const drop = $('#drop');
+    drop.onclick = e => { if (e.target.id !== 'shotClear') $('#shot').click(); };
+    $('#shot').onchange = e => setShot(e.target.files[0]);
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); setShot(e.dataTransfer.files[0]); };
+    $('#shotClear').onclick = e => { e.preventDefault(); e.stopPropagation(); shot = null; $('#shotPrev').hidden = true; $('#shotClear').hidden = true; drop.classList.remove('filled'); $('#shot').value = ''; };
+    f.onpaste = e => { const item = [...(e.clipboardData?.items || [])].find(x => x.type.startsWith('image/')); if (item) { e.preventDefault(); setShot(item.getAsFile()); } };
+    document.onpaste = e => { if (current === 'journal' && !f.hidden && !e.target.closest('#tradeForm')) f.onpaste(e); };
+    f.onsubmit = e => { e.preventDefault(); busy(f.querySelector('button.dark'), async () => {
       const body = Object.fromEntries(new FormData(f)); body.asset = body.asset.toUpperCase();
+      if (shot) body.image = shot;
       const r = await api('/journal', { method: 'POST', body }); toast('Saved ' + r.path); render();
     }); };
   },

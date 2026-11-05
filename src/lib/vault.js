@@ -3,7 +3,39 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from './frontmatter.js';
 
-export const DIRS = ['Trades', 'Strategies', 'Psychology', 'Agents', 'Insights', 'Log', 'Templates'];
+export const DIRS = ['Trades', 'Strategies', 'Psychology', 'Agents', 'Insights', 'Log', 'Templates', 'Attachments'];
+
+/* ---------- images (trade screenshots) ---------- */
+export const IMAGE_EXT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+const MAX_IMAGE = 8 * 1024 * 1024;
+const b64ToBytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+function bytesToB64(bytes) {
+  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+/** Save a data: URL image under Attachments/ and return its vault path. */
+export function saveImage(root, dataUrl, baseName) {
+  const m = /^data:image\/(png|jpeg|jpg|webp|gif);base64,([A-Za-z0-9+/=\s]+)$/.exec(String(dataUrl || ''));
+  if (!m) throw Object.assign(new Error('The screenshot must be a PNG, JPEG, WebP or GIF image'), { status: 400 });
+  const bytes = b64ToBytes(m[2].replace(/\s/g, ''));
+  if (bytes.length > MAX_IMAGE) throw Object.assign(new Error('Screenshot is larger than 8 MB'), { status: 413 });
+  const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+  let rel = `Attachments/${safeName(baseName)}.${ext}`, i = 2;
+  while (fs.existsSync(resolveInVault(root, rel))) rel = `Attachments/${safeName(baseName)} ${i++}.${ext}`;
+  const full = resolveInVault(root, rel);
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  fs.writeFileSync(full, bytes);
+  return rel;
+}
+/** Read a vault image back as a data: URL (works in the browser build too). */
+export function readImage(root, rel) {
+  const ext = String(rel).split('.').pop().toLowerCase();
+  if (!IMAGE_EXT[ext]) throw Object.assign(new Error('Not an image'), { status: 400 });
+  const raw = fs.readFileSync(resolveInVault(root, rel));
+  const bytes = typeof raw === 'string' ? new TextEncoder().encode(raw) : new Uint8Array(raw.buffer ? raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) : raw);
+  return `data:${IMAGE_EXT[ext]};base64,${bytesToB64(bytes)}`;
+}
 
 const TEMPLATE_TRADE = `---
 date: 2026-01-01 09:00
@@ -180,8 +212,10 @@ export function toTrade(note) {
   if (r === null && entry && stop && exit && entry !== stop) r = ((exit - entry) * dir) / Math.abs(entry - stop);
   const sections = {};
   for (const m of note.body.matchAll(/^##\s+(.+)\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/gm)) sections[m[1].trim().toLowerCase()] = m[2].trim();
+  let image = d.image ? String(d.image) : null;
+  if (!image) { const em = note.body.match(/!\[\[([^\]|]+\.(?:png|jpe?g|webp|gif))(?:\|[^\]]*)?\]\]/i); if (em) image = em[1].includes('/') ? em[1] : `Attachments/${em[1]}`; }
   return {
-    path: note.path, date: String(d.date || ''), asset: String(d.asset || ''), side, entry, stop, exit, size,
+    image, path: note.path, date: String(d.date || ''), asset: String(d.asset || ''), side, entry, stop, exit, size,
     pnl: pnl ?? 0, r: r === null ? null : Math.round(r * 100) / 100, strategy: String(d.strategy || ''),
     emotion: String(d.emotion || ''), tags: Array.isArray(d.tags) ? d.tags.map(String) : (d.tags ? [String(d.tags)] : []),
     thesis: sections.thesis || '', psychology: sections.psychology || '',
@@ -205,5 +239,10 @@ export function createJournalTrade(root, t) {
   };
   const body = `## Thesis\n${t.thesis || ''}\n\n## Psychology\n${t.psychology || ''}\n\n## Went well\n${t.wentWell || ''}\n\n## Went wrong\n${t.wentWrong || ''}\n`;
   const rel = uniquePath(root, `Trades/${date.slice(0, 10)} ${asset} ${side}.md`);
+  if (t.image) {
+    const img = saveImage(root, t.image, path.basename(rel, '.md'));
+    data.image = img;
+    return writeNote(root, rel, data, `![[${path.basename(img)}]]\n\n` + body);
+  }
   return writeNote(root, rel, data, body);
 }

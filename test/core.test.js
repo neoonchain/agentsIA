@@ -266,3 +266,21 @@ test('HTTP API: host check, header check, journal round trip, errors', async () 
     assert.deepEqual(view.assets, ['BTC-USD']);
   } finally { server.close(); }
 });
+
+test('journal screenshots: saved as attachments, embedded for Obsidian, read back, sent to Analyse', async () => {
+  const app = freshApp('shots'); app.setConfig(updateConfig(app.config, { apiKey: 'k' }));
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const rel = V.createJournalTrade(app.vault, { asset: 'BTC-USD', side: 'long', entry: 100, stop: 95, exit: 110, size: 1, image: png });
+  const note = V.readNote(app.vault, rel);
+  assert.match(note.data.image, /^Attachments\/.+\.png$/);
+  assert.match(note.body, /^!\[\[.+\.png\]\]/);
+  assert.ok(fs.existsSync(path.join(app.vault, note.data.image)));
+  assert.equal(V.readImage(app.vault, note.data.image), png);
+  assert.equal(V.listJournal(app.vault)[0].image, note.data.image);
+  assert.throws(() => V.createJournalTrade(app.vault, { asset: 'BTC-USD', entry: 1, image: 'data:text/html;base64,PHNjcmlwdD4=' }), /PNG, JPEG/);
+  assert.throws(() => V.readImage(app.vault, 'rules.md'), /Not an image/);
+  const seen = [];
+  setMockLLM(({ task, images }) => { seen.push({ task, n: images?.length || 0 }); return task === 'analyse' ? JSON.stringify({ summary: 's', strengths: [], weaknesses: [], strategy: null }) : '{"agree": true, "issues": [], "patterns": [], "rules": []}'; });
+  await app.analyse();
+  assert.equal(seen.find(x => x.task === 'analyse').n, 1);
+});

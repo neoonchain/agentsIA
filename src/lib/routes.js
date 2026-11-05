@@ -26,6 +26,7 @@ export function createApi(app) {
     ['GET', /^\/api\/journal$/, async () => V.listJournal(app.vault)],
     ['POST', /^\/api\/journal$/, async (_, b) => ({ path: V.createJournalTrade(app.vault, b) })],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
+    ['GET', /^\/api\/image$/, async q => ({ dataUrl: V.readImage(app.vault, q.get('path')) })],
     ['GET', /^\/api\/notes$/, async q => V.listNotes(app.vault, q.get('dir') || '.')],
     ['GET', /^\/api\/rules$/, async () => app.rules()],
     ['PUT', /^\/api\/rules$/, async (_, b) => {

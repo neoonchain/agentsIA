@@ -37,11 +37,12 @@ export async function closeInstruction(config, ins) {
   }
 }
 
-export async function chat(ins, { modelId, system, user, task, role, maxTokens = 1500, web = false }) {
+export async function chat(ins, { modelId, system, user, task, role, maxTokens = 1500, web = false, images = [] }) {
   ins.calls++;
-  if (mockFn) return mockFn({ task, role, modelId, system, user });
-  if (ins.ticket) return proxyChat(ins, { modelId, system, user, maxTokens });
-  const body = { model: modelId, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
+  if (mockFn) return mockFn({ task, role, modelId, system, user, images });
+  if (ins.ticket) return proxyChat(ins, { modelId, system, user, maxTokens }); // free trial: text only
+  const content = images.length ? [{ type: 'text', text: user }, ...images.map(url => ({ type: 'image_url', image_url: { url } }))] : user;
+  const body = { model: modelId, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content }] };
   if (web) body.plugins = [{ id: 'web', max_results: 3 }];
   let r;
   try {

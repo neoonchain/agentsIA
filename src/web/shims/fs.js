@@ -24,7 +24,7 @@ function changed(p, kind) {
 export function existsSync(p) { p = norm(p); return files.has(p) || dirs.has(p); }
 export function mkdirSync(p) { addDirs(p); }
 export function readFileSync(p) { p = norm(p); if (!files.has(p)) throw enoent(p); return files.get(p); }
-export function writeFileSync(p, data) { p = norm(p); addDirs(parent(p)); files.set(p, String(data)); changed(p, 'write'); }
+export function writeFileSync(p, data) { p = norm(p); addDirs(parent(p)); files.set(p, data instanceof Uint8Array ? data : String(data)); changed(p, 'write'); }
 export function appendFileSync(p, data) { p = norm(p); addDirs(parent(p)); files.set(p, (files.get(p) || '') + String(data)); changed(p, 'write'); }
 export function renameSync(a, b) {
   a = norm(a); b = norm(b);
@@ -109,7 +109,7 @@ export function idbBackend(ns) {
 
 /** Real folder backend (Chrome / Edge): reads and writes the user's Obsidian vault directly. */
 export function dirBackend(root) {
-  const TEXT = /\.(md|json)$/i;
+  const TEXT = /\.(md|json)$/i, IMG = /\.(png|jpe?g|webp|gif)$/i;
   async function dirFor(rel, create) {
     let d = root;
     for (const part of rel.split('/').slice(0, -1)) d = await d.getDirectoryHandle(part, { create });
@@ -123,6 +123,7 @@ export function dirBackend(root) {
           if (name.startsWith('.') && name !== '.agentsia') continue; // skip .obsidian, .git, .trash…
           if (h.kind === 'directory') await walk(h, pre + name + '/');
           else if (TEXT.test(name)) out[pre + name] = await (await h.getFile()).text();
+          else if (IMG.test(name)) out[pre + name] = new Uint8Array(await (await h.getFile()).arrayBuffer());
         }
       }
       await walk(root, '');

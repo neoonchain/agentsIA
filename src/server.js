@@ -17,7 +17,7 @@ const STATIC = {
 
 async function readBody(req) {
   let size = 0; const chunks = [];
-  for await (const c of req) { size += c.length; if (size > 1e6) throw err(413, 'Body too large'); chunks.push(c); }
+  for await (const c of req) { size += c.length; if (size > 12e6) throw err(413, 'Body too large'); chunks.push(c); }
   if (!size) return {};
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw err(400, 'Invalid JSON'); }
 }

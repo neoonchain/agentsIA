@@ -101,6 +101,16 @@ export class App {
     return `Journal stats: ${trades.length} trades, win rate ${m.winRate}%, profit factor ${m.profitFactor}, total PnL ${m.totalPnl}, avg R ${m.avgR}, max drawdown ${m.maxDrawdownPct}%.\n\nRecent trades:\n${lines.join('\n') || '(no trades logged yet)'}\n\nStrategy and psychology notes:\n${extra || '(none)'}`;
   }
 
+  /** Most recent journal screenshots as data URLs (capped so a request stays small). */
+  journalImages(n = 4, maxBytes = 3e6) {
+    const out = []; let total = 0;
+    for (const t of V.listJournal(this.vault).reverse()) {
+      if (!t.image || out.length >= n) continue;
+      try { const dataUrl = V.readImage(this.vault, t.image); if (total + dataUrl.length > maxBytes) break; total += dataUrl.length; out.push({ trade: t.path, dataUrl }); } catch { /* missing file */ }
+    }
+    return out;
+  }
+
   /* ---------- ask ---------- */
   ask(question) {
     const q = String(question || '').trim().slice(0, 2000);
@@ -139,7 +149,8 @@ export class App {
         const r = await this.call(ins, 'lead', 'analyse', `Analyse the journal: performance, psychology and one strategy to paper trade. Reply ONLY with JSON: {"summary": "...", "strengths": ["..."], "weaknesses": ["..."], "psychology": {"patterns": ["..."], "rules": ["..."]}, ${stratSpec}}. Assets use Coinbase symbols like BTC-USD.`, ctx, { maxTokens: 2000 });
         steps.push(r); lead = parseJSON(r.text); psych = lead.psychology || psych;
       } else {
-        const r = await this.call(ins, 'lead', 'analyse', `You are the lead analyst. Find what wins and what loses in this journal and propose one strategy to paper trade. Reply ONLY with JSON: {"summary": "...", "strengths": ["..."], "weaknesses": ["..."], ${stratSpec}}. Assets use Coinbase symbols like BTC-USD.`, ctx, { maxTokens: 2000 });
+        const shots = this.journalImages(4);
+        const r = await this.call(ins, 'lead', 'analyse', `You are the lead analyst. Find what wins and what loses in this journal and propose one strategy to paper trade.${shots.length ? ` You also get the user's chart screenshots of their ${shots.length} most recent trades with one; use what you see (entries, levels, timing).` : ''} Reply ONLY with JSON: {"summary": "...", "strengths": ["..."], "weaknesses": ["..."], ${stratSpec}}. Assets use Coinbase symbols like BTC-USD.`, ctx, { maxTokens: 2000, images: shots.map(x => x.dataUrl) });
         steps.push(r); lead = parseJSON(r.text);
         if (this.roleOn('psychology')) {
           const p = await this.call(ins, 'psychology', 'psychology', 'You are the psychology coach. From the emotion, psychology and went-wrong notes, find behaviour patterns and turn them into concrete rules. Reply ONLY with JSON: {"patterns": ["..."], "rules": ["..."]}', ctx, { maxTokens: 1000 });
