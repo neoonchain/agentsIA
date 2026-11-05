@@ -2,7 +2,7 @@
 
 A local trading journal in an Obsidian vault, plus AI models (Claude Opus 5.5, Fable 5.1, Sonnet 5.5, GPT-6.1 Terra, GPT-6 Astra, Gemini, Grok, all through OpenRouter) that learn from it and **paper trade** crypto. A strategy may only ask for real capital once it beats the marks you set, and you approve every step.
 
-> **This version is paper only.** Approving a promotion is recorded, but no real-money orders are placed.
+> Real money runs on **Kraken spot** (long only, no leverage), only for strategies whose promotion you approved, and only after you type the strategy name to confirm. Trading can lose money; paper results do not guarantee live results.
 
 ## Run it
 
@@ -45,6 +45,20 @@ npm test
 - **Brake** is plain code, not a model. It enforces strategy assets and hours, the stop, max risk per trade, the daily loss pause, the max drawdown stop, and one position per asset.
 - **Evaluator**: checks paper trades, days, profit factor, max drawdown, adherence to the strategy and net profit against `rules.md`. Only then can you request and approve real capital.
 - **Prices**: public Coinbase API (Kraken fallback). Paper fills include fees and slippage from `rules.md`.
+
+## Real money (Kraken)
+
+1. In **Team settings → Kraken**, connect an API key with only *Query Funds*, *Query Open/Closed Orders & Trades*, *Create & Modify Orders* and *Cancel/Close Orders*. The app refuses any key that can withdraw.
+2. When a strategy beats your marks, request and approve the promotion. The approved tier (`first_tier_usd`, $250 by default) becomes its real-money allocation.
+3. On the strategy page, **Go live · validate mode**: Kraken checks every order but executes nothing, and fills are simulated at the live bid/ask. Use it to confirm everything works.
+4. **Go live · real money**, typing the strategy name to confirm. From then on:
+   - **Orders:** market buys sized so the loss at the stop is the strategy's risk on the allocation, capped by the allocation and your USD balance.
+   - **Stops:** every buy is followed immediately by a **stop-loss order on Kraken**, so it protects you even if the app is closed. If placing the stop fails, the position is sold straight back.
+   - **Exits:** take profit is watched by the app; reaching it cancels the stop and sells. If a stop disappears on Kraken, the position is sold.
+   - **Brake checks before each buy:** long only, `min_24h_volume_usd` and `max_spread_pct`, which matter most for memecoins. Daily-loss pause and max-drawdown stop on the allocation; the drawdown stop sells everything and sends the strategy back to paper.
+5. **Back to paper** closes every live position at market.
+
+**Assets:** anything Kraken lists against USD, written as `BASE-USD`. That covers BTC, ETH and SOL, and memecoins such as DOGE, SHIB, PEPE, BONK, WIF, FLOKI, TRUMP and PENGU. Tokens that only trade on decentralized exchanges (pump.fun and similar) are not available.
 
 ## API keys and the free trial
 

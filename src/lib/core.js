@@ -6,6 +6,9 @@ import * as V from './vault.js';
 import * as T from './trading.js';
 import { getPrice, getCandles, candleSummary, validAsset } from './market.js';
 import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
+import * as K from './kraken.js';
+import * as L from './live.js';
+const px = L.fmtPx;
 
 const BASE = `You are part of agentsIA, a trading-journal assistant working from the user's own Obsidian vault.
 Be concrete and brief. Refer to notes as [[Note name]]. Never invent trades or numbers that are not in the data you are given.
@@ -25,7 +28,7 @@ export class App {
     V.initVault(this.vault);
     this.stateFile = path.join(this.vault, '.agentsia', 'state.json');
     try { this.state = JSON.parse(fs.readFileSync(this.stateFile, 'utf8')); } catch { this.state = {}; }
-    this.state.accounts ||= {}; this.state.promotions ||= {};
+    this.state.accounts ||= {}; this.state.promotions ||= {}; this.state.live ||= {};
   }
   save() {
     const tmp = this.stateFile + '.tmp';
@@ -65,6 +68,8 @@ export class App {
     const n = V.readNote(this.vault, s.path);
     V.writeNote(this.vault, s.path, { ...n.data, status }, n.body);
   }
+  liveOf(name) { const l = this.state.live[name]; return l?.enabled ? l : null; }
+  creds() { return this.config.kraken || null; }
   account(name) {
     return (this.state.accounts[name] ||= T.newAccount(this.rules()));
   }
@@ -175,19 +180,23 @@ export class App {
     try {
       const s = this.strategy(name);
       const rules = this.rules();
-      const acc = this.account(name);
+      const live = this.liveOf(name);
+      const acc = live ? live.account : this.account(name);
       if (!s.assets.length) throw new Error('Strategy has no assets');
       const prices = {}, charts = {};
-      for (const a of s.assets) { prices[a] = await getPrice(a); charts[a] = candleSummary(await getCandles(a, 48)); }
-      for (const ev of T.riskTick(acc, prices, rules)) this.handleRiskEvent(s, ev);
+      for (const a of s.assets) { prices[a] = live ? (await K.ticker(a)).mid : await getPrice(a); charts[a] = candleSummary(await getCandles(a, 48)); }
+      if (live) { const rs = L.liveRiskState(live, prices, rules); if (rs) await this.handleLiveRisk(s, live, rs); }
+      else for (const ev of T.riskTick(acc, prices, rules)) this.handleRiskEvent(s, ev);
       if (acc.paused || this.strategy(name).status === 'stopped' && !manual) { this.save(); return { action: 'skip', reason: acc.paused?.reason || 'stopped' }; }
 
       return await this.instruction('trade', async ins => {
         const steps = [];
         const market = s.assets.map(a => `## ${a} price ${prices[a]}\n${charts[a]}`).join('\n\n');
-        const positions = Object.values(acc.positions).map(p => `${p.asset} ${p.side} qty ${p.qty.toFixed(6)} entry ${p.entry.toFixed(2)} stop ${p.stop} tp ${p.takeProfit}`).join('\n') || 'none';
+        const positions = Object.values(acc.positions).map(p => `${p.asset} ${p.side} qty ${px(p.qty)} entry ${px(p.entry)} stop ${p.stop} tp ${p.takeProfit}`).join('\n') || 'none';
+        const where = live ? 'REAL-MONEY (Kraken spot: long only, no shorting, no leverage)' : 'paper';
         const ctxParts = [`Strategy note [[${s.name}]]:\n${s.body}`, `Strategy settings: assets ${s.assets.join(', ')}, hours ${s.hours_utc || 'any'} UTC, max risk ${Math.min(Number(s.risk_per_trade_pct) || 1, Number(rules.max_risk_per_trade_pct) || 2)}% per trade.`,
-          `Open paper positions: ${positions}`, `Paper equity ${T.equity(acc, prices).toFixed(2)} (start ${acc.startBalance}). Current UTC time ${new Date().toISOString()}.`];
+          `Open ${where} positions: ${positions}`, `${live ? 'Real allocation' : 'Paper'} equity ${T.equity(acc, prices).toFixed(2)} (start ${acc.startBalance}). Current UTC time ${new Date().toISOString()}.`];
+        if (live) ctxParts.push('This strategy trades REAL money on Kraken: only "long" opens are possible. Prefer "hold" when the setup is not clean.');
         if (this.roleOn('charts')) {
           const c = await this.call(ins, 'charts', 'chart', 'You read charts. From these candles give trend, support, resistance and whether a setup matching the strategy is forming. Reply ONLY with JSON: {"assets": {"BTC-USD": {"trend": "up|down|range", "support": 0, "resistance": 0, "setup": "..."}}}', market, { maxTokens: 700 });
           steps.push(c); ctxParts.push(`Chart reading (${c.model}):\n${c.text}`);
@@ -212,19 +221,34 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
           try { const v = parseJSON(rv.text); reviewerAgreed = v.agree === true; reviewReason = String(v.reason || ''); } catch { reviewerAgreed = false; reviewReason = 'Unreadable review'; }
         }
         const price = prices[p.asset];
-        const verdict = (p.action === 'open' && typeof price !== 'number')
+        let verdict = (p.action === 'open' && typeof price !== 'number')
           ? { ok: false, reasons: [`${p.asset} is not in the strategy`], offStrategy: true }
           : T.brake(p, { strategy: s, rules, acc, price, mode: this.config.mode, reviewerAgreed });
+        if (live && p.action === 'open' && verdict.ok) {
+          const extra = L.liveChecks(p, await K.ticker(p.asset), rules);
+          if (extra.length) verdict = { ok: false, reasons: extra, offStrategy: p.side !== 'long' };
+        }
         if (p.action !== 'hold') { acc.proposals.total++; if (verdict.offStrategy) acc.proposals.offStrategy++; }
         acc.lastDecisionAt = new Date().toISOString();
-        let result = { action: p.action, proposal: p, verdict, reviewerAgreed, reviewReason, steps, mode: this.config.mode };
+        let result = { action: p.action, proposal: p, verdict, reviewerAgreed, reviewReason, steps, mode: this.config.mode, live: live ? live.mode : null };
         if (p.action === 'hold') this.note(`[[${s.name}]] hold · ${String(p.thesis || '').slice(0, 100)}`);
         else if (!verdict.ok) this.note(`[[${s.name}]] ${p.action} ${p.asset} blocked · ${verdict.reasons.join('; ')}${reviewReason ? ' · reviewer: ' + reviewReason.slice(0, 80) : ''}`);
-        else if (p.action === 'close') { const t = T.closePosition(acc, p.asset, price, 'model close', rules); this.recordClose(s, t); result.trade = t; }
+        else if (p.action === 'close') {
+          const t = live ? await L.closeLive({ creds: this.creds(), live, asset: p.asset, reason: 'model close', rules }) : T.closePosition(acc, p.asset, price, 'model close', rules);
+          this.recordClose(s, t); result.trade = t;
+        }
         else {
           const notePath = V.uniquePath(this.vault, `Agents/${V.safeName(s.name)}/${new Date().toISOString().slice(0, 10)} ${p.asset} ${p.side}.md`);
-          const pos = T.openPosition(acc, { asset: p.asset, side: p.side, price, stop: Number(p.stop), takeProfit: p.take_profit ? Number(p.take_profit) : null, riskPct: Number(p.risk_pct), rules,
-            meta: { notePath, thesis: String(p.thesis || ''), proposer: lead.model, reviewer: steps.find(x => x.role === 'reviewer')?.model || null } });
+          const meta = { notePath, thesis: String(p.thesis || ''), proposer: lead.model, reviewer: steps.find(x => x.role === 'reviewer')?.model || null };
+          let pos;
+          try {
+            pos = live ? await L.openLive({ creds: this.creds(), live, asset: p.asset, p, rules, meta })
+              : T.openPosition(acc, { asset: p.asset, side: p.side, price, stop: Number(p.stop), takeProfit: p.take_profit ? Number(p.take_profit) : null, riskPct: Number(p.risk_pct), rules, meta });
+          } catch (e) {
+            result.verdict = { ok: false, reasons: [e.message], offStrategy: false };
+            this.note(`[[${s.name}]] open ${p.asset} failed · ${e.message}`); this.save();
+            return result;
+          }
           if (this.roleOn('scribe')) {
             try {
               const sc = await this.call(ins, 'scribe', 'scribe', 'You are the scribe. Rewrite this trade thesis as a clean journal entry in 2-4 short sentences: setup, why now, invalidation. Plain text, no headings.', `Proposal: ${JSON.stringify(p)}\n\n${ctxParts.slice(-1)[0] || ''}`, { maxTokens: 300 });
@@ -232,7 +256,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
             } catch { /* keep the lead's own thesis */ }
           }
           this.writeTradeNote(s, pos, p, reviewReason, steps);
-          this.note(`[[${s.name}]] opened paper ${p.side} ${p.asset} @ ${pos.entry.toFixed(2)} stop ${pos.stop} · ${lead.model}${pos.reviewer ? ' + ' + pos.reviewer : ''}`);
+          this.note(`[[${s.name}]] opened ${live ? (live.mode === 'real' ? 'REAL Kraken' : 'Kraken-validated') : 'paper'} ${p.side} ${p.asset} @ ${px(pos.entry)} stop ${pos.stop} · ${lead.model}${pos.reviewer ? ' + ' + pos.reviewer : ''}`);
           result.position = pos;
         }
         this.save();
@@ -244,12 +268,12 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   writeTradeNote(s, pos, p, reviewReason, steps, exit = null) {
     const links = [].concat(p?.links || []).map(l => `- [[${String(l).replace(/[\[\]]/g, '')}]]`).join('\n');
     V.writeNote(this.vault, pos.notePath, {
-      date: pos.openedAt.slice(0, 16).replace('T', ' '), asset: pos.asset, side: pos.side, entry: +pos.entry.toFixed(2), stop: pos.stop,
-      take_profit: pos.takeProfit, size: +pos.qty.toFixed(6), exit: exit ? +exit.exit.toFixed(2) : null, pnl: exit ? exit.pnl : null, r: exit ? exit.r : null,
-      status: exit ? 'closed' : 'open', strategy: s.name, account: 'paper', proposer: pos.proposer, reviewer: pos.reviewer, tags: ['agent', 'paper'],
+      date: pos.openedAt.slice(0, 16).replace('T', ' '), asset: pos.asset, side: pos.side, entry: px(pos.entry), stop: pos.stop,
+      take_profit: pos.takeProfit, size: px(pos.qty), exit: exit ? px(exit.exit) : null, pnl: exit ? exit.pnl : null, r: exit ? exit.r : null,
+      status: exit ? 'closed' : 'open', strategy: s.name, account: pos.mode ? `kraken-${pos.mode}` : 'paper', kraken_entry: pos.entryTxid || undefined, kraken_stop: pos.stopTxid || undefined, proposer: pos.proposer, reviewer: pos.reviewer, tags: ['agent', 'paper'],
     }, `## Thesis\n${pos.thesis}\n\n## Second opinion\n${pos.reviewer ? `${pos.reviewer}: ${reviewReason || 'agreed'}` : 'Solo mode: no second opinion.'}\n\n## Sources\n${links || '- (none given)'}\n` +
       (steps ? `\n## Models involved\n${steps.map(x => `- ${x.role}: ${x.model}`).join('\n')}\n` : '') +
-      (exit ? `\n## Result\nClosed by ${exit.reason} at ${exit.exit.toFixed(2)}: ${exit.pnl >= 0 ? '+' : ''}${exit.pnl} USD (${exit.r}R).\n` : ''));
+      (exit ? `\n## Result\nClosed by ${exit.reason} at ${px(exit.exit)}: ${exit.pnl >= 0 ? '+' : ''}${exit.pnl} USD (${exit.r}R).\n` : ''));
   }
 
   recordClose(s, t) {
@@ -257,8 +281,8 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     if (t.notePath) {
       try {
         const n = V.readNote(this.vault, t.notePath);
-        V.writeNote(this.vault, t.notePath, { ...n.data, exit: +t.exit.toFixed(2), pnl: t.pnl, r: t.r, status: 'closed' },
-          n.body + `\n## Result\nClosed by ${t.reason} at ${t.exit.toFixed(2)}: ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R).\n`);
+        V.writeNote(this.vault, t.notePath, { ...n.data, exit: px(t.exit), pnl: t.pnl, r: t.r, status: 'closed' },
+          n.body + `\n## Result\nClosed by ${t.reason} at ${px(t.exit)}: ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R).\n`);
       } catch { /* note was moved or deleted by the user */ }
     }
     this.note(`[[${s.name}]] closed ${t.asset} by ${t.reason} · ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R)`);
@@ -274,14 +298,20 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   /* ---------- scheduler: exits every tick, decisions on each strategy's interval ---------- */
   async tick(now = new Date()) {
     const out = [];
-    const watched = this.strategies().filter(x => x.status === 'running' || Object.keys(this.state.accounts[x.name]?.positions || {}).length);
+    const watched = this.strategies().filter(x => x.status === 'running' || this.liveOf(x.name) || Object.keys(this.state.accounts[x.name]?.positions || {}).length);
     for (const s of watched) {
       try {
-        const acc = this.account(s.name), rules = this.rules();
+        const live = this.liveOf(s.name), rules = this.rules();
+        const acc = live ? live.account : this.account(s.name);
         const prices = {};
-        for (const a of new Set([...s.assets, ...Object.keys(acc.positions)])) prices[a] = await getPrice(a);
-        for (const t of T.checkExits(acc, prices, rules, now)) this.recordClose(s, t);
-        for (const ev of T.riskTick(acc, prices, rules, now)) this.handleRiskEvent(s, ev);
+        for (const a of new Set([...s.assets, ...Object.keys(acc.positions)])) prices[a] = live ? (await K.ticker(a)).bid : await getPrice(a);
+        if (live) {
+          for (const t of await L.syncLive({ creds: this.creds(), live, rules, prices })) this.recordClose(s, t);
+          const rs = L.liveRiskState(live, prices, rules, now); if (rs) await this.handleLiveRisk(s, live, rs);
+        } else {
+          for (const t of T.checkExits(acc, prices, rules, now)) this.recordClose(s, t);
+          for (const ev of T.riskTick(acc, prices, rules, now)) this.handleRiskEvent(s, ev);
+        }
         this.save();
         const due = !acc.lastDecisionAt || now - Date.parse(acc.lastDecisionAt) >= (Number(s.interval_min) || 60) * 60000;
         if (s.status === 'running' && due && !acc.paused && !this.locks.has(s.name) && this.strategy(s.name).status === 'running') out.push({ name: s.name, ...(await this.decide(s.name)) });
@@ -305,7 +335,59 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     this.strategy(name); this.setStrategyStatus(name, 'stopped');
     this.note(`[[${name}]] stopped by you`);
   }
+  async handleLiveRisk(s, live, rs) {
+    for (const a of Object.keys(live.account.positions)) this.recordClose(s, await L.closeLive({ creds: this.creds(), live, asset: a, reason: rs.action === 'stop' ? 'live max drawdown' : 'live daily loss limit', rules: this.rules() }));
+    if (rs.action === 'stop') { live.enabled = false; live.stoppedReason = rs.reason; this.setStrategyStatus(s.name, 'stopped'); this.note(`[[${s.name}]] REAL MONEY STOPPED by Brake · ${rs.reason} · back to paper`); }
+    else this.note(`[[${s.name}]] real money paused until tomorrow · ${rs.reason}`);
+    this.save();
+  }
+
+  async setKraken({ key, secret }) {
+    key = String(key || '').trim(); secret = String(secret || '').trim();
+    if (!key || !secret) throw Object.assign(new Error('Paste both the API key and the private key'), { status: 400 });
+    const creds = { key, secret };
+    let check;
+    try { check = await K.checkKey(creds); } catch (e) { throw Object.assign(new Error(`Kraken rejected the key: ${e.message}`), { status: 400 }); }
+    if (!check.ok) throw Object.assign(new Error(check.reason), { status: 400 });
+    this.config.kraken = { ...creds, checkedAt: new Date().toISOString() }; saveConfig(this.config);
+    this.note('Kraken key connected (trade only, no withdrawals)');
+  }
+  removeKraken() {
+    if (Object.values(this.state.live).some(l => l.enabled)) throw Object.assign(new Error('Send every live strategy back to paper first'), { status: 400 });
+    delete this.config.kraken; saveConfig(this.config); this.note('Kraken key removed');
+  }
+
+  async enableLive(name, { mode, confirm }) {
+    const s = this.strategy(name), promo = this.state.promotions[name];
+    if (promo?.status !== 'approved') throw Object.assign(new Error('Approve the promotion first'), { status: 400 });
+    if (!this.config.kraken) throw Object.assign(new Error('Connect a Kraken key in Team settings first'), { status: 400, code: 'NEED_EXCHANGE' });
+    if (!this.config.apiKey) throw Object.assign(new Error('Live trading needs your own OpenRouter API key'), { status: 402, code: 'NEED_KEY' });
+    if (mode !== 'validate' && mode !== 'real') throw Object.assign(new Error('Mode must be validate or real'), { status: 400 });
+    if (this.liveOf(name)?.mode === mode) throw Object.assign(new Error(`Already live in ${mode} mode`), { status: 400 });
+    if (this.liveOf(name) && Object.keys(this.liveOf(name).account.positions).length) throw Object.assign(new Error('Close the open live positions before switching mode'), { status: 400 });
+    if (mode === 'real' && confirm !== s.name) throw Object.assign(new Error('Type the strategy name to confirm real money'), { status: 400 });
+    for (const a of s.assets) await K.resolvePair(a); // every asset must exist on Kraken
+    const allocationUsd = Number(promo.tierUsd) || 250;
+    if (mode === 'real') {
+      const bal = await K.quoteBalance(this.config.kraken, 'USD');
+      if (bal < allocationUsd) throw Object.assign(new Error(`Kraken USD balance $${bal.toFixed(2)} is below the $${allocationUsd} allocation`), { status: 400 });
+    }
+    this.state.live[name] = L.newLive({ allocationUsd, mode, rules: this.rules() });
+    this.setStrategyStatus(name, 'running'); this.save();
+    this.note(`[[${name}]] ${mode === 'real' ? 'REAL MONEY ENABLED' : 'Kraken validate mode enabled'} · allocation $${allocationUsd} · ${this.config.mode} mode`);
+    return this.state.live[name];
+  }
+  async disableLive(name) {
+    const s = this.strategy(name), live = this.liveOf(name);
+    if (!live) throw Object.assign(new Error('Not live'), { status: 400 });
+    if (this.locks.has(name)) throw Object.assign(new Error('A decision is running; try again in a moment'), { status: 409 });
+    for (const a of Object.keys(live.account.positions)) this.recordClose(s, await L.closeLive({ creds: this.creds(), live, asset: a, reason: 'back to paper by you', rules: this.rules() }));
+    live.enabled = false; live.stoppedReason = 'by you'; this.save();
+    this.note(`[[${name}]] back to paper by you · live positions closed`);
+  }
+
   async closeAll(name) {
+    if (this.liveOf(name)) await this.disableLive(name);
     const s = this.strategy(name), acc = this.account(name), rules = this.rules();
     for (const a of Object.keys(acc.positions)) this.recordClose(s, T.closePosition(acc, a, await getPrice(a), 'closed by you', rules));
     this.stop(name); this.save();
@@ -314,6 +396,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     this.strategy(name);
     if (this.locks.has(name)) throw Object.assign(new Error('A decision is running; try again in a moment'), { status: 409 });
     if (Object.keys(this.account(name).positions).length) throw Object.assign(new Error('Close the open positions first'), { status: 400 });
+    if (this.liveOf(name)) throw Object.assign(new Error('Send the strategy back to paper first'), { status: 400 });
     this.state.accounts[name] = T.newAccount(this.rules()); delete this.state.promotions[name]; this.save();
     this.note(`[[${name}]] paper account reset`);
   }
@@ -336,7 +419,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       this.state.promotions[name] = { ...cur, status: 'rejected', rejectedAt: new Date().toISOString() };
     } else throw Object.assign(new Error('Unknown action'), { status: 400 });
     this.save();
-    this.note(`[[${name}]] promotion ${action}${action === 'approve' ? ` · $${cur.tierUsd} tier (real-money execution is not enabled in this version)` : ''}`);
+    this.note(`[[${name}]] promotion ${action}${action === 'approve' ? ` · $${cur.tierUsd} tier approved; go live from the strategy page` : ''}`);
     return this.state.promotions[name];
   }
 
@@ -345,6 +428,14 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     const prices = {};
     for (const a of Object.keys(acc.positions)) { try { prices[a] = await getPrice(a); } catch { /* offline */ } }
     const { body, ...meta } = s;
-    return { ...meta, body, equity: +T.equity(acc, prices).toFixed(2), account: acc, prices, evaluation: T.evaluate(acc, this.rules()), promotion: this.state.promotions[name] || null };
+    const lv = this.state.live[name] || null;
+    let live = null;
+    if (lv) {
+      const lp = {};
+      for (const a of Object.keys(lv.account.positions)) { try { lp[a] = (await K.ticker(a)).bid; } catch { /* offline */ } }
+      live = { ...lv, equity: +T.equity(lv.account, lp).toFixed(2), prices: lp, metrics: T.metrics(lv.account.trades, lv.allocationUsd) };
+    }
+    return { ...meta, body, equity: +T.equity(acc, prices).toFixed(2), account: acc, prices, evaluation: T.evaluate(acc, this.rules()), promotion: this.state.promotions[name] || null,
+      live, exchange: { connected: !!this.config.kraken } };
   }
 }

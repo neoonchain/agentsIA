@@ -34,7 +34,8 @@ export function createServer(app = new App()) {
       const rules = app.rules();
       const strategies = app.strategies().map(s => {
         const acc = app.account(s.name), ev = T.evaluate(acc, rules);
-        return { name: s.name, status: s.status, draft: !!s.draft, assets: s.assets, trades: acc.trades.length, open: Object.keys(acc.positions).length,
+        const lv = app.liveOf(s.name);
+        return { name: s.name, status: s.status, draft: !!s.draft, live: lv ? lv.mode : null, assets: s.assets, trades: acc.trades.length, open: Object.keys(acc.positions).length,
           pnl: ev.metrics.totalPnl, eligible: ev.eligible, paused: acc.paused, promotion: app.state.promotions[s.name]?.status || null };
       });
       return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length,
@@ -75,6 +76,13 @@ export function createServer(app = new App()) {
       return app.decide(name, { manual: true });
     }],
     ['POST', /^\/api\/strategies\/([^/]+)\/promotion$/, async (_, b, m) => app.promotion(m[1], b.action)],
+    ['POST', /^\/api\/strategies\/([^/]+)\/live$/, async (_, b, m) => {
+      if (b.action === 'enable') return app.enableLive(m[1], { mode: b.mode, confirm: b.confirm });
+      if (b.action === 'disable') return await app.disableLive(m[1]), { ok: true };
+      throw err(400, 'Unknown action');
+    }],
+    ['PUT', /^\/api\/exchange$/, async (_, b) => { await app.setKraken(b); return publicConfig(app.config); }],
+    ['DELETE', /^\/api\/exchange$/, async () => { app.removeKraken(); return publicConfig(app.config); }],
     ['POST', /^\/api\/ask$/, async (_, b) => app.ask(b.question)],
     ['POST', /^\/api\/analyse$/, async () => app.analyse()],
     ['GET', /^\/api\/price$/, async q => ({ asset: q.get('asset'), price: await getPrice(q.get('asset')) })],

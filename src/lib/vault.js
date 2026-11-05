@@ -41,9 +41,11 @@ max_drawdown_pct: 8
 min_adherence_pct: 90
 daily_loss_pct: 3
 max_risk_per_trade_pct: 2
-fee_pct: 0.1
+fee_pct: 0.4
 slippage_pct: 0.05
 first_tier_usd: 250
+min_24h_volume_usd: 1000000
+max_spread_pct: 0.5
 ---
 
 # Marks and limits
@@ -52,6 +54,7 @@ Only you edit this file. The agents read it on every decision and the app never 
 
 - **Marks** (min_trades, min_days, min_profit_factor, max_drawdown_pct, min_adherence_pct) decide when a paper strategy may ask for real capital.
 - **Limits** (daily_loss_pct, max_risk_per_trade_pct, max_drawdown_pct) are enforced by Brake, which is plain code, not a model.
+- **Real money** (Kraken spot, long only): min_24h_volume_usd and max_spread_pct keep the agents out of thin, illiquid markets, which matters most for memecoins.
 `;
 
 const STRATEGY = `---
@@ -109,6 +112,10 @@ export function initVault(root) {
     const f = path.join(root, rel);
     if (!fs.existsSync(f)) fs.writeFileSync(f, content);
   }
+  // add rules introduced in later versions to existing vaults, without touching the user's values
+  const rf = path.join(root, 'rules.md'), cur = parse(fs.readFileSync(rf, 'utf8')), defaults = parse(RULES).data;
+  const missing = Object.keys(defaults).filter(k => !(k in cur.data));
+  if (missing.length) fs.writeFileSync(rf, stringify({ ...cur.data, ...Object.fromEntries(missing.map(k => [k, defaults[k]])) }, cur.body));
 }
 
 export function readNote(root, rel) {

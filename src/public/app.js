@@ -3,6 +3,7 @@ const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const fp = x => (typeof x === 'number' && Number.isFinite(x) ? (Math.abs(x) >= 1 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : Number(x.toPrecision(4)).toString()) : (x ?? '–'));
 const cls = n => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
 const ago = iso => { const s = (Date.now() - Date.parse(iso)) / 1000; return s < 60 ? 'now' : s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd'; };
 const agoText = iso => { const a = ago(iso); return a === 'now' ? 'just now' : a + ' ago'; };
@@ -165,7 +166,7 @@ const views = {
     const r = await api('/rules');
     const label = { starting_balance: 'Paper starting balance (USD)', min_trades: 'Mark · minimum paper trades', min_days: 'Mark · minimum days on paper', min_profit_factor: 'Mark · minimum profit factor',
       max_drawdown_pct: 'Mark & limit · max drawdown %', min_adherence_pct: 'Mark · follows strategy %', daily_loss_pct: 'Limit · daily loss %', max_risk_per_trade_pct: 'Limit · max risk per trade %',
-      fee_pct: 'Paper fee % per side', slippage_pct: 'Paper slippage %', first_tier_usd: 'First real-money tier (USD)' };
+      fee_pct: 'Paper fee % per side', slippage_pct: 'Paper slippage %', first_tier_usd: 'First real-money tier (USD)', min_24h_volume_usd: 'Real money · min 24h volume (USD)', max_spread_pct: 'Real money · max spread %' };
     view.innerHTML = `<div class="head"><div><h1>Marks and limits</h1><p>Stored in <span class="mono">rules.md</span> in your vault. Models read it but can never change it. Brake enforces the limits in code.</p></div></div>
       <form class="card soft form" id="rf">${Object.entries(r).map(([k, v]) => `<label>${esc(label[k] || k)}<input name="${esc(k)}" type="number" step="any" min="0" value="${esc(v)}"></label>`).join('')}
       <div class="w4"><button class="btn dark">Save rules</button></div></form>`;
@@ -186,6 +187,9 @@ const views = {
           <div class="row"><input id="key" type="password" placeholder="sk-or-..." autocomplete="off" style="flex:1"><button class="btn dark" id="saveKey">Save key</button>${c.hasApiKey ? '<button class="btn red" id="delKey">Remove</button>' : ''}</div>
           <label style="margin-top:16px">Vault folder<input id="vault" value="${esc(c.vaultPath)}"></label><button class="btn sm" id="saveVault" style="margin-top:8px">Change vault</button></div>
       </div>
+      <div class="card" style="margin-top:16px"><h2>Kraken · real money</h2>
+        <p class="sub" style="margin:8px 0 12px">${c.hasKraken ? `Connected (${esc(c.krakenHint)}), checked ${esc(String(c.krakenCheckedAt).slice(0, 10))}: can trade, cannot withdraw.` : 'On Kraken: Settings → API → Create key. Enable only <b>Query Funds</b>, <b>Query Open/Closed Orders & Trades</b>, <b>Create & Modify Orders</b> and <b>Cancel/Close Orders</b>. Never enable Withdraw: the app refuses keys that can.'} Keys stay on this computer only.</p>
+        <div class="row"><input id="krKey" placeholder="API key" autocomplete="off" style="flex:1"><input id="krSecret" type="password" placeholder="Private key" autocomplete="off" style="flex:1"><button class="btn dark" id="saveKr" data-busy="Checking key">Connect</button>${c.hasKraken ? '<button class="btn red" id="delKr">Remove</button>' : ''}</div></div>
       <div class="card" style="margin-top:16px"><h2>Roles</h2><p class="sub" style="margin:6px 0 12px">Used in Team mode. Lead is always on. Brake (risk) is code, not a model.</p>
         <div class="tblwrap"><table><tr><th>On</th><th>Role</th><th>What it does</th><th>Model</th></tr>
         ${Object.entries(R).map(([k, r]) => `<tr><td><input type="checkbox" data-role-on="${k}" ${c.enabledRoles[k] ? 'checked' : ''} ${k === 'lead' ? 'disabled' : ''} style="width:auto"></td><td><b>${esc(r.label)}</b></td><td class="sub">${esc(r.desc)}</td><td><select data-role="${k}">${opts(c.roles[k])}</select></td></tr>`).join('')}</table></div></div>
@@ -200,6 +204,8 @@ const views = {
     view.querySelectorAll('[data-role-on]').forEach(s => (s.onchange = () => save({ enabledRoles: { [s.dataset.roleOn]: s.checked } }, 'Role saved')));
     $('#saveKey').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Paste a key first', true); save({ apiKey: k }, 'Key saved'); };
     if ($('#delKey')) $('#delKey').onclick = () => save({ apiKey: '' }, 'Key removed');
+    $('#saveKr').onclick = e => busy(e.currentTarget, async () => { settings = await api('/exchange', { method: 'PUT', body: { key: $('#krKey').value, secret: $('#krSecret').value } }); renderHeader(); toast('Kraken connected: trade only, no withdrawals'); render(); });
+    if ($('#delKr')) $('#delKr').onclick = async () => { try { settings = await api('/exchange', { method: 'DELETE' }); toast('Kraken key removed'); render(); } catch (er) { fail(er); } };
     $('#saveVault').onclick = () => save({ vaultPath: $('#vault').value }, 'Vault changed');
     $('#saveIds').onclick = () => save({ models: Object.fromEntries([...view.querySelectorAll('[data-model]')].map(i => [i.dataset.model, i.value])) }, 'Model IDs saved');
   },
@@ -214,6 +220,8 @@ const views = {
 };
 
 function chip(s) {
+  if (s.live === 'real') return '<span class="chip ok">live · real</span>';
+  if (s.live === 'validate') return '<span class="chip run">live · validate</span>';
   if (s.draft) return '<span class="chip">draft</span>';
   if (s.paused) return '<span class="chip bad">paused</span>';
   if (s.promotion === 'approved') return '<span class="chip ok">approved</span>';
@@ -241,19 +249,48 @@ async function renderStrategy(name) {
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><h3>Your marks</h3><div class="checks" style="margin-top:8px">${ev.checks.map(c => `<div class="c ${c.pass ? 'pass' : 'fail'}"><span>${esc(c.label)}</span><span>${esc(c.value)} ${c.pass ? '✓' : '✗'}</span></div>`).join('')}</div>
         <div class="row" style="margin-top:14px">${p?.status === 'requested' ? `<span class="sub">Requested $${esc(p.tierUsd)} of real capital.</span><button class="btn dark sm" data-promo="approve">Approve</button><button class="btn sm" data-promo="reject">Reject</button>`
-          : p?.status === 'approved' ? `<span class="chip ok">approved</span><span class="sub">Real-money execution is not enabled in this version: the strategy keeps running on paper.</span>`
+          : p?.status === 'approved' ? `<span class="chip ok">approved</span><span class="sub">$${esc(p.tierUsd)} tier approved. Go live in the Real money panel below.</span>`
           : `<button class="btn sm" data-promo="request" ${ev.eligible ? '' : 'disabled'}>Request real capital</button><span class="sub">${ev.eligible ? 'All marks beaten.' : 'Available once every mark is beaten.'}</span>`}</div></div>
-      <div class="card"><h3>Open positions</h3>${pos.length ? `<table style="margin-top:8px"><tr><th>Asset</th><th>Side</th><th>Entry</th><th>Stop</th><th>TP</th><th>Now</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${esc(x.asset)}</td><td>${esc(x.side)}</td><td class="num">${x.entry.toFixed(2)}</td><td class="num">${esc(x.stop)}</td><td class="num">${esc(x.takeProfit ?? '–')}</td><td class="num">${esc(s.prices[x.asset] ?? '–')}</td></tr>`).join('')}</table>` : '<p class="empty">No open positions.</p>'}</div>
+      <div class="card"><h3>Open positions</h3>${pos.length ? `<table style="margin-top:8px"><tr><th>Asset</th><th>Side</th><th>Entry</th><th>Stop</th><th>TP</th><th>Now</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${esc(x.asset)}</td><td>${esc(x.side)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)}</td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(s.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No open positions.</p>'}</div>
     </div>
+    ${p?.status === 'approved' || s.live ? liveCard(s) : ''}
     <div class="card" style="margin-top:16px"><h3>Closed paper trades</h3>${a.trades.length ? `<div class="tblwrap"><table style="margin-top:8px"><tr><th>Closed</th><th>Asset</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>R</th><th>Reason</th><th>Models</th></tr>
-      ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${esc(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${t.entry.toFixed(2)}</td><td class="num">${t.exit.toFixed(2)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
+      ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${esc(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
   box.querySelectorAll('[data-act]').forEach(b => (b.onclick = () => busy(b, async () => {
     const act = b.dataset.act;
     if ((act === 'close-all' || act === 'reset') && !confirm(act === 'reset' ? 'Reset this paper account? Its trades and evaluation start from zero.' : 'Close every open paper position at market and stop the strategy?')) return;
     const r = await api(`/strategies/${encodeURIComponent(name)}/${act}`, { method: 'POST' });
     if (act === 'run') { await renderStrategy(name); showDecision(r); } else { toast('Done'); render(); }
   })));
+  box.querySelectorAll('[data-live]').forEach(b => (b.onclick = () => busy(b, async () => {
+    const act = b.dataset.live;
+    const body = { action: act === 'off' ? 'disable' : 'enable', mode: act };
+    if (act === 'real') {
+      const typed = prompt(`REAL MONEY on Kraken.\n\nThe agents will place real spot orders with up to $${s.promotion?.tierUsd} of your Kraken USD balance. Every buy gets a stop-loss on Kraken, but you can still lose this money.\n\nType the strategy name to confirm:\n${name}`);
+      if (typed === null) return;
+      body.confirm = typed.trim();
+    }
+    if (act === 'off' && !confirm('Close every live position at market on Kraken and send this strategy back to paper?')) return;
+    await api(`/strategies/${encodeURIComponent(name)}/live`, { method: 'POST', body });
+    toast(act === 'off' ? 'Back to paper' : act === 'real' ? 'Real money enabled' : 'Validate mode enabled'); render();
+  })));
   box.querySelectorAll('[data-promo]').forEach(b => (b.onclick = () => busy(b, async () => { await api(`/strategies/${encodeURIComponent(name)}/promotion`, { method: 'POST', body: { action: b.dataset.promo } }); toast('Saved'); render(); })));
+}
+
+function liveCard(s) {
+  const l = s.live, on = l && l.enabled;
+  const head = `<div class="head" style="margin-bottom:10px"><div><h3>Real money · Kraken spot ${on ? (l.mode === 'real' ? '<span class="chip ok">live · real</span>' : '<span class="chip run">validate mode</span>') : ''}</h3>
+    <p class="sub" style="margin-top:6px">Long only, no leverage. Every buy gets a stop-loss order on Kraken. Brake checks liquidity and spread before each buy; memecoins included if Kraken lists them.</p></div>`;
+  if (!s.exchange.connected) return `<div class="card" style="margin-top:16px">${head}</div><div class="banner info">Connect a Kraken API key in <a href="#team">Team</a> first (trade-only, no withdrawals).</div></div>`;
+  if (!on) return `<div class="card" style="margin-top:16px">${head}<div class="row"><button class="btn" data-live="validate" data-busy="Checking">Go live · validate mode</button><button class="btn dark" data-live="real" data-busy="Checking">Go live · real money</button></div></div>
+    <p class="sub">${l?.stoppedReason ? `Last live run stopped: ${esc(l.stoppedReason)}. ` : ''}Validate mode sends every order to Kraken for checking but executes nothing. Start there.</p></div>`;
+  const m = l.metrics, pos = Object.values(l.account.positions);
+  return `<div class="card" style="margin-top:16px;border-color:${l.mode === 'real' ? 'var(--lime-ink)' : 'var(--blue)'}">${head}<button class="btn red" data-live="off" data-busy="Closing">Back to paper</button></div>
+    ${l.account.paused ? `<div class="banner">Paused until tomorrow: ${esc(l.account.paused.reason)}</div>` : ''}
+    <div class="grid g4"><div class="stat"><span class="eyebrow">Allocation</span><div class="n">$${esc(l.allocationUsd)}</div></div><div class="stat"><span class="eyebrow">Live equity</span><div class="n">$${l.equity.toLocaleString('en-US')}</div></div>
+      <div class="stat"><span class="eyebrow">Live PnL</span><div class="n ${cls(m.totalPnl)}">${money(m.totalPnl)}</div></div><div class="stat"><span class="eyebrow">Live trades</span><div class="n">${m.count}</div></div></div>
+    ${pos.length ? `<table style="margin-top:14px"><tr><th>Asset</th><th>Qty</th><th>Entry</th><th>Stop on Kraken</th><th>TP</th><th>Bid</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${esc(x.asset)}</td><td class="num">${fp(x.qty)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)} <span class="sub">${esc(x.stopTxid || (x.mode === 'validate' ? 'simulated' : ''))}</span></td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(l.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No live positions.</p>'}
+    ${l.account.trades.length ? `<div class="tblwrap"><table style="margin-top:10px"><tr><th>Closed</th><th>Asset</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Reason</th></tr>${l.account.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${esc(t.asset)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td>${esc(t.reason)}</td></tr>`).join('')}</table></div>` : ''}</div>`;
 }
 
 function showDecision(r) {
@@ -262,7 +299,7 @@ function showDecision(r) {
   const p = r.proposal || {}, v = r.verdict || { ok: true, reasons: [] };
   const what = p.action === 'hold' ? 'Hold' : `${p.action} ${p.side || ''} ${p.asset || ''}`;
   el.innerHTML = `<div class="card ${v.ok ? 'soft' : ''}" style="margin-top:16px;${v.ok ? '' : 'border-color:var(--red)'}"><span class="eyebrow">Decision · ${esc(r.mode)} mode</span>
-    <h3 style="margin:8px 0">${esc(what)} ${p.action !== 'hold' ? (v.ok ? '<span class="chip ok">executed on paper</span>' : '<span class="chip bad">blocked</span>') : ''}</h3>
+    <h3 style="margin:8px 0">${esc(what)} ${p.action !== 'hold' ? (v.ok ? `<span class="chip ok">${r.live === 'real' ? 'executed on Kraken · real money' : r.live === 'validate' ? 'validated by Kraken · simulated fill' : 'executed on paper'}</span>` : '<span class="chip bad">blocked</span>') : ''}</h3>
     <p class="md">${esc(p.thesis || '')}</p>${v.reasons.length ? `<ul class="md">${v.reasons.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
     ${r.reviewReason ? `<p class="sub">Second opinion: ${esc(r.reviewReason)}</p>` : ''}
     <div class="steps">${(r.steps || []).map(s => `<details><summary>${esc(s.role)} · ${esc(s.model)}</summary><pre>${esc(s.text)}</pre></details>`).join('')}</div></div>`;

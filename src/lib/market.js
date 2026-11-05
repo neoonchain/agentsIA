@@ -1,11 +1,11 @@
-// Public crypto prices: Coinbase first, Kraken as fallback. No keys needed.
+// Public crypto prices: Coinbase first, Kraken as fallback (covers memecoins Coinbase lacks). No keys needed.
+import * as K from './kraken.js';
 const cache = new Map();
 const TTL = 15000;
 let mock = null; // { prices: {asset: number}, candles?: [...] } for tests
 
 export function setMockMarket(m) { mock = m; cache.clear(); }
 
-const KRAKEN = { 'BTC-USD': 'XBTUSD', 'ETH-USD': 'ETHUSD', 'SOL-USD': 'SOLUSD' };
 
 async function getJSON(url) {
   const r = await fetch(url, { headers: { 'User-Agent': 'agentsia/0.1' }, signal: AbortSignal.timeout(10000) });
@@ -24,10 +24,7 @@ export async function getPrice(asset) {
   try {
     v = Number((await getJSON(`https://api.coinbase.com/v2/prices/${asset}/spot`)).data.amount);
   } catch (e) {
-    const pair = KRAKEN[asset] || asset.replace('-', '');
-    const j = await getJSON(`https://api.kraken.com/0/public/Ticker?pair=${pair}`);
-    if (j.error?.length) throw new Error(`Kraken: ${j.error.join(', ')}`);
-    v = Number(Object.values(j.result)[0].c[0]);
+    v = (await K.ticker(asset)).last;
   }
   if (!Number.isFinite(v) || v <= 0) throw new Error(`Bad price for ${asset}`);
   cache.set('p:' + asset, { t: Date.now(), v });
@@ -40,8 +37,11 @@ export async function getCandles(asset, limit = 48) {
   if (mock) return (mock.candles || []).slice(-limit);
   const hit = cache.get('c:' + asset);
   if (hit && Date.now() - hit.t < 60000) return hit.v.slice(-limit);
-  const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=3600`);
-  const v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
+  let v;
+  try {
+    const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=3600`);
+    v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
+  } catch { v = await K.ohlc(asset, 60); }
   cache.set('c:' + asset, { t: Date.now(), v });
   return v.slice(-limit);
 }
