@@ -16,7 +16,8 @@ export function metrics(trades, startBalance = 10000) {
   return {
     count: closed.length, wins: wins.length, losses: losses.length,
     winRate: closed.length ? round((wins.length / closed.length) * 100, 1) : 0,
-    profitFactor: gl > 0 ? round(gp / gl) : (gp > 0 ? Infinity : 0),
+    // undefined until there is at least one loss: never report an 'infinite' edge
+    profitFactor: gl > 0 ? round(gp / gl) : null,
     totalPnl: round(gp - gl), avgR: rs.length ? round(rs.reduce((a, b) => a + b, 0) / rs.length) : 0,
     maxDrawdownPct: round(maxDD * 100), firstAt: first ? new Date(first).toISOString() : null,
   };
@@ -69,6 +70,16 @@ export function closePosition(acc, asset, price, reason, rules, now = new Date()
   delete acc.positions[asset];
   acc.peakEquity = Math.max(acc.peakEquity, equity(acc));
   return trade;
+}
+
+/** Remember how far each open position went for and against us, in R (used for lessons). */
+export function trackExcursion(acc, prices) {
+  for (const p of Object.values(acc.positions)) {
+    const px = prices[p.asset];
+    if (typeof px !== 'number') continue;
+    const dist = Math.abs(p.entry - p.stop) || 1, r = ((px - p.entry) * (p.side === 'long' ? 1 : -1)) / dist;
+    p.mfeR = Math.max(p.mfeR ?? 0, r); p.maeR = Math.min(p.maeR ?? 0, r);
+  }
 }
 
 /** Close any position whose stop or take profit the price has reached. */
@@ -156,7 +167,7 @@ export function evaluate(acc, rules, now = new Date()) {
   const checks = [
     { key: 'min_trades', label: `Paper trades ≥ ${R('min_trades')}`, value: m.count, pass: m.count >= R('min_trades') },
     { key: 'min_days', label: `Days on paper ≥ ${R('min_days')}`, value: days, pass: days >= R('min_days') },
-    { key: 'min_profit_factor', label: `Profit factor ≥ ${R('min_profit_factor')}`, value: m.profitFactor === Infinity ? '∞' : m.profitFactor, pass: m.count > 0 && m.profitFactor >= R('min_profit_factor') },
+    { key: 'min_profit_factor', label: `Profit factor ≥ ${R('min_profit_factor')}`, value: m.profitFactor ?? 'n/a (no losses yet)', pass: m.profitFactor !== null && m.profitFactor >= R('min_profit_factor') },
     { key: 'max_drawdown_pct', label: `Max drawdown ≤ ${R('max_drawdown_pct')}%`, value: m.maxDrawdownPct + '%', pass: m.maxDrawdownPct <= R('max_drawdown_pct') },
     { key: 'min_adherence_pct', label: `Follows strategy ≥ ${R('min_adherence_pct')}%`, value: adherence + '%', pass: adherence >= R('min_adherence_pct') },
     { key: 'net_profit', label: 'Net profit > 0', value: m.totalPnl, pass: m.totalPnl > 0 },

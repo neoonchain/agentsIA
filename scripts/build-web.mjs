@@ -12,6 +12,7 @@ fs.rmSync(out, { recursive: true, force: true });
 const copy = (from, to) => { fs.mkdirSync(path.dirname(path.join(out, to)), { recursive: true }); fs.copyFileSync(path.join(root, from), path.join(out, to)); };
 
 copy('index.html', 'index.html');
+for (const f of fs.existsSync(path.join(root, 'assets')) ? fs.readdirSync(path.join(root, 'assets')) : []) copy(`assets/${f}`, `assets/${f}`);
 for (const f of fs.readdirSync(path.join(root, 'src/lib'))) if (f.endsWith('.js')) copy(`src/lib/${f}`, `app/lib/${f}`);
 for (const f of fs.readdirSync(path.join(root, 'src/web/shims'))) copy(`src/web/shims/${f}`, `app/shims/${f}`);
 copy('src/web/boot.js', 'app/boot.js');

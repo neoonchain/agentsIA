@@ -69,7 +69,7 @@ async function approvedLiveApp(mode = 'real') {
   app.setConfig(updateConfig(app.config, { apiKey: 'or-key', mode: 'solo' }));
   const n = V.readNote(app.vault, 'rules.md'); V.writeNote(app.vault, 'rules.md', { ...n.data, ...RULES }, n.body);
   const s = V.readNote(app.vault, 'Strategies/Range breakout.md'); V.writeNote(app.vault, 'Strategies/Range breakout.md', { ...s.data, assets: ['BTC-USD', 'PEPE-USD'], hours_utc: '00:00-23:59' }, s.body);
-  const acc = app.account('Range breakout'); acc.trades = [{ pnl: 10, r: 1 }]; acc.proposals = { total: 1, offStrategy: 0 };
+  const acc = app.account('Range breakout'); acc.trades = [{ pnl: 20, r: 2 }, { pnl: -5, r: -0.5 }]; acc.proposals = { total: 1, offStrategy: 0 };
   app.promotion('Range breakout', 'request'); app.promotion('Range breakout', 'approve');
   await app.setKraken({ key: 'KEY', secret: SECRET });
   await app.enableLive('Range breakout', { mode, confirm: 'Range breakout' });

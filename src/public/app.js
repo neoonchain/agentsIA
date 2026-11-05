@@ -4,6 +4,13 @@ const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const fp = x => (typeof x === 'number' && Number.isFinite(x) ? (Math.abs(x) >= 1 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : Number(x.toPrecision(4)).toString()) : (x ?? '–'));
+/** Small samples show counts, not a misleading percentage. */
+const MIN_RATE = 10;
+const rateCell = (w, l) => (w + l >= MIN_RATE
+  ? `<div class="n">${Math.round((w / (w + l)) * 100)}%</div><span class="sub">${w}W · ${l}L</span>`
+  : `<div class="n">${w}W · ${l}L</div><span class="sub">${w + l ? `rate after ${MIN_RATE} trades` : 'no trades yet'}</span>`);
+/** No losses means the profit factor is not computable yet: never "infinite". */
+const pfCell = pf => (pf == null ? `<div class="n">—</div><span class="sub">needs a losing trade</span>` : `<div class="n">${pf}</div>`);
 const cls = n => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
 const ago = iso => { const s = (Date.now() - Date.parse(iso)) / 1000; return s < 60 ? 'now' : s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd'; };
 const agoText = iso => { const a = ago(iso); return a === 'now' ? 'just now' : a + ' ago'; };
@@ -108,8 +115,8 @@ const views = {
       ${free ? `<div class="banner ${settings.freeAvailable ? 'info' : ''}">${settings.freeAvailable ? `You have <b>${Math.max(settings.freeLimit - settings.freeUsed, 0)} of ${settings.freeLimit}</b> free instructions (Ask or Analyse). After that, and for paper trading, add your own OpenRouter API key in <a href="#team">Team</a>.` : `Add your OpenRouter API key in <a href="#team">Team</a> to use the models. Journaling works without it.`}</div>` : ''}
       <div class="grid g4">
         <div class="card stat"><span class="eyebrow">Journal trades</span><div class="n">${s.journalCount}</div></div>
-        <div class="card stat"><span class="eyebrow">Win rate</span><div class="n">${j.winRate}%</div></div>
-        <div class="card stat"><span class="eyebrow">Profit factor</span><div class="n">${j.profitFactor === null ? '∞' : j.profitFactor}</div></div>
+        <div class="card stat"><span class="eyebrow">Win rate</span>${rateCell(j.wins, j.losses)}</div>
+        <div class="card stat"><span class="eyebrow">Profit factor</span>${pfCell(j.profitFactor)}</div>
         <div class="card stat"><span class="eyebrow">Journal PnL</span><div class="n ${cls(j.totalPnl)}">${money(j.totalPnl)}</div></div>
       </div>
       <div class="grid g2" style="margin-top:16px">
@@ -126,7 +133,7 @@ const views = {
     const sum = (a, f) => a.reduce((x, t) => x + f(t), 0);
     const wins = trades.filter(t => t.pnl > 0), losses = trades.filter(t => t.pnl < 0);
     const gp = sum(wins, t => t.pnl), gl = -sum(losses, t => t.pnl), rs = trades.map(t => t.r).filter(r => typeof r === 'number');
-    const pf = gl > 0 ? (gp / gl).toFixed(2) : gp > 0 ? '∞' : '–';
+    const pf = gl > 0 ? +(gp / gl).toFixed(2) : null;
     // cumulative PnL curve
     let acc = 0; const pts = [0, ...trades.map(t => (acc += t.pnl))];
     const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1, W = 560, H = 120;
@@ -144,8 +151,8 @@ const views = {
             : '<p class="empty">The curve appears after two trades.</p>'}</div>
         <div class="jnums">
           <div class="card stat"><span class="eyebrow">Trades</span><div class="n">${trades.length}</div></div>
-          <div class="card stat"><span class="eyebrow">Win rate</span><div class="n">${trades.length ? Math.round((wins.length / trades.length) * 100) : 0}%</div></div>
-          <div class="card stat"><span class="eyebrow">Profit factor</span><div class="n">${pf}</div></div>
+          <div class="card stat"><span class="eyebrow">Win rate</span>${rateCell(wins.length, losses.length)}</div>
+          <div class="card stat"><span class="eyebrow">Profit factor</span>${pfCell(pf)}</div>
           <div class="card stat"><span class="eyebrow">Avg R</span><div class="n ${cls(rs.length ? sum(rs, r => r) : 0)}">${rs.length ? (sum(rs, r => r) / rs.length).toFixed(2) : '–'}</div></div>
         </div>
       </div>
@@ -343,6 +350,8 @@ async function renderStrategy(name) {
       <div class="card"><h3>Open positions</h3>${pos.length ? `<table style="margin-top:8px"><tr><th>Asset</th><th>Side</th><th>Entry</th><th>Stop</th><th>TP</th><th>Now</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${esc(x.asset)}</td><td>${esc(x.side)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)}</td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(s.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No open positions.</p>'}</div>
     </div>
     ${p?.status === 'approved' || s.live ? liveCard(s) : ''}
+    <div class="card lessons" style="margin-top:16px"><div class="row" style="justify-content:space-between"><h3>Lessons learned</h3><span class="sub">Written after every close · read before every decision · <a href="#" data-note="${esc('Lessons/' + s.name + '.md')}">open note</a></span></div>
+      ${s.lessons?.length ? s.lessons.map(l => `<div class="lesson ${/· -/.test(l.title) ? 'loss' : 'win'}"><b class="mono">${esc(l.title)}</b><ul>${l.lines.filter(x => !x.startsWith('Thesis')).map(x => `<li>${md(x).replace(/<\/?p>/g, '')}</li>`).join('')}</ul></div>`).join('') : '<p class="empty">No closed trades yet. Each one will leave a lesson here.</p>'}</div>
     <div class="card" style="margin-top:16px"><h3>Closed paper trades</h3>${a.trades.length ? `<div class="tblwrap"><table style="margin-top:8px"><tr><th>Closed</th><th>Asset</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>R</th><th>Reason</th><th>Models</th></tr>
       ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${esc(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
   box.querySelectorAll('[data-act]').forEach(b => (b.onclick = () => busy(b, async () => {

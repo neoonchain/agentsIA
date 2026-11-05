@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parse, stringify } from './frontmatter.js';
 
-export const DIRS = ['Trades', 'Strategies', 'Psychology', 'Agents', 'Insights', 'Log', 'Templates', 'Attachments'];
+export const DIRS = ['Trades', 'Strategies', 'Psychology', 'Agents', 'Insights', 'Log', 'Templates', 'Attachments', 'Lessons'];
 
 /* ---------- images (trade screenshots) ---------- */
 export const IMAGE_EXT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };

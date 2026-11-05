@@ -34,6 +34,11 @@ export function createServer(app = new App()) {
       const host = String(req.headers.host || '').replace(/:\d+$/, '');
       if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) return send(403, { error: 'Forbidden host' });
       const url = new URL(req.url, 'http://localhost');
+      if (req.method === 'GET' && /^\/assets\/[\w.-]+\.(webp|png|jpg|svg)$/.test(url.pathname)) {
+        const f = path.join(ROOT, 'assets', path.basename(url.pathname));
+        const type = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', svg: 'image/svg+xml' }[url.pathname.split('.').pop()];
+        if (fs.existsSync(f)) return send(200, fs.readFileSync(f), type);
+      }
       if (req.method === 'GET' && STATIC[url.pathname]) {
         const [file, type] = STATIC[url.pathname];
         return send(200, fs.readFileSync(file), type);

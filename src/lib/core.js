@@ -98,7 +98,7 @@ export class App {
       `- [[${path.basename(t.path, '.md')}]] ${t.date} ${t.asset} ${t.side} entry ${t.entry} stop ${t.stop} exit ${t.exit} pnl ${t.pnl} R ${t.r ?? '?'} strategy "${t.strategy}" emotion "${t.emotion}" tags ${t.tags.join(',')}\n  thesis: ${t.thesis.slice(0, 200)}\n  psychology: ${t.psychology.slice(0, 160)}\n  went well: ${t.wentWell.slice(0, 160)}\n  went wrong: ${t.wentWrong.slice(0, 160)}`);
     const extra = [...V.listNotes(this.vault, 'Strategies'), ...V.listNotes(this.vault, 'Psychology')]
       .map(p => `### [[${path.basename(p, '.md')}]]\n${V.readNote(this.vault, p).body.slice(0, 800)}`).join('\n\n');
-    return `Journal stats: ${trades.length} trades, win rate ${m.winRate}%, profit factor ${m.profitFactor}, total PnL ${m.totalPnl}, avg R ${m.avgR}, max drawdown ${m.maxDrawdownPct}%.\n\nRecent trades:\n${lines.join('\n') || '(no trades logged yet)'}\n\nStrategy and psychology notes:\n${extra || '(none)'}`;
+    return `Journal stats: ${trades.length} trades, wins ${m.wins} / losses ${m.losses}, profit factor ${m.profitFactor ?? 'n/a (no losses yet)'}, total PnL ${m.totalPnl}, avg R ${m.avgR}, max drawdown ${m.maxDrawdownPct}%.\n\nRecent trades:\n${lines.join('\n') || '(no trades logged yet)'}\n\nStrategy and psychology notes:\n${extra || '(none)'}`;
   }
 
   /** Most recent journal screenshots as data URLs (capped so a request stays small). */
@@ -196,6 +196,7 @@ export class App {
       if (!s.assets.length) throw new Error('Strategy has no assets');
       const prices = {}, charts = {};
       for (const a of s.assets) { prices[a] = live ? (await K.ticker(a)).mid : await getPrice(a); charts[a] = candleSummary(await getCandles(a, 48)); }
+      T.trackExcursion(acc, prices);
       if (live) { const rs = L.liveRiskState(live, prices, rules); if (rs) await this.handleLiveRisk(s, live, rs); }
       else for (const ev of T.riskTick(acc, prices, rules)) this.handleRiskEvent(s, ev);
       if (acc.paused || this.strategy(name).status === 'stopped' && !manual) { this.save(); return { action: 'skip', reason: acc.paused?.reason || 'stopped' }; }
@@ -207,6 +208,8 @@ export class App {
         const where = live ? 'REAL-MONEY (Kraken spot: long only, no shorting, no leverage)' : 'paper';
         const ctxParts = [`Strategy note [[${s.name}]]:\n${s.body}`, `Strategy settings: assets ${s.assets.join(', ')}, hours ${s.hours_utc || 'any'} UTC, max risk ${Math.min(Number(s.risk_per_trade_pct) || 1, Number(rules.max_risk_per_trade_pct) || 2)}% per trade.`,
           `Open ${where} positions: ${positions}`, `${live ? 'Real allocation' : 'Paper'} equity ${T.equity(acc, prices).toFixed(2)} (start ${acc.startBalance}). Current UTC time ${new Date().toISOString()}.`];
+        const lessons = this.lessonsText(s.name, 6);
+        if (lessons) ctxParts.push(`Lessons from this strategy's previous trades, written after each one closed. Apply them:\n${lessons}`);
         if (live) ctxParts.push('This strategy trades REAL money on Kraken: only "long" opens are possible. Prefer "hold" when the setup is not clean.');
         if (this.roleOn('charts')) {
           const c = await this.call(ins, 'charts', 'chart', 'You read charts. From these candles give trend, support, resistance and whether a setup matching the strategy is forming. Reply ONLY with JSON: {"assets": {"BTC-USD": {"trend": "up|down|range", "support": 0, "resistance": 0, "setup": "..."}}}', market, { maxTokens: 700 });
@@ -297,6 +300,64 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       } catch { /* note was moved or deleted by the user */ }
     }
     this.note(`[[${s.name}]] closed ${t.asset} by ${t.reason} · ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R)`);
+    this.learn(s, t);
+  }
+
+  /* ---------- learning loop: every closed trade leaves a lesson the next decisions read ---------- */
+  lessonsPath(name) { return `Lessons/${V.safeName(name)}.md`; }
+  /** Deterministic lessons from what actually happened; no model needed. */
+  factLessons(t) {
+    const out = [], r = +t.r || 0, mfe = +(t.mfeR ?? Math.max(r, 0)).toFixed(2), mae = +(t.maeR ?? Math.min(r, 0)).toFixed(2);
+    const hours = Math.max(0, (Date.parse(t.closedAt) - Date.parse(t.openedAt)) / 3600000);
+    const feeShare = t.riskUsd > 0 ? (t.fees || 0) / t.riskUsd : 0;
+    if (r < 0 && mfe >= 0.4) out.push(`It was +${mfe}R in favour before failing: take part of the position at +1R, or tighten the stop once +1R is reached.`);
+    if (r < 0 && mfe < 0.15) out.push(`It never really went in favour (best +${mfe}R): treat this setup as a likely false breakout and demand stronger confirmation (volume above average, a second close outside).`);
+    if (r < 0 && hours < 3) out.push(`Stopped within ${hours.toFixed(1)}h: the stop may be too tight for current volatility.`);
+    if (r > 0 && mae <= -0.6) out.push(`Won, but went ${mae}R against first: the stop was nearly hit, so enter closer to the level or wait for a retest.`);
+    if (r > 0 && /take profit/.test(t.reason)) out.push(`Target reached in ${hours.toFixed(1)}h: the 2R target fits this kind of move.`);
+    if (feeShare >= 0.2) out.push(`Fees took ${Math.round(feeShare * 100)}% of the planned risk: prefer targets of 2.5R or more, and fewer, larger moves.`);
+    if (/drawdown|daily loss/.test(t.reason)) out.push(`Closed by Brake (${t.reason}): the strategy was trading through a losing streak.`);
+    if (!out.length) out.push(r > 0 ? 'Worked as planned.' : 'Lost within plan: the stop did its job.');
+    return { out, mfe, mae, hours, feeShare };
+  }
+  learn(s, t) {
+    if (!t) return;
+    const rel = this.lessonsPath(s.name);
+    const f = this.factLessons(t);
+    let cur; try { cur = V.readNote(this.vault, rel); } catch { cur = { data: { strategy: s.name, tags: ['lessons'] }, body: `# Lessons · ${s.name}\n\nWritten automatically after every closed trade. The agents read the latest ones before each decision.\n` }; }
+    const title = `${String(t.closedAt).slice(0, 10)} ${t.asset} ${t.side} · ${t.r >= 0 ? '+' : ''}${t.r}R · ${t.reason}`;
+    const entry = `\n## ${title}\n- Result: ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R), held ${f.hours.toFixed(1)}h, best +${f.mfe}R / worst ${f.mae}R, fees ${(t.fees || 0).toFixed(2)} USD.\n${t.thesis ? `- Thesis: ${String(t.thesis).replace(/\n+/g, ' ').slice(0, 300)}\n` : ''}${f.out.map(x => `- Lesson: ${x}`).join('\n')}\n`;
+    V.writeNote(this.vault, rel, cur.data, cur.body.trimEnd() + '\n' + entry);
+    const p = this.reflect(s, t, title, f).catch(() => {});
+    (this.pendingLessons ||= new Set()).add(p); p.finally(() => this.pendingLessons.delete(p));
+  }
+  /** The model's own post-mortem, appended to the same entry. Needs the user's key; skipped otherwise. */
+  async reflect(s, t, title, f) {
+    let ins; try { ins = await openInstruction(this.config, 'trade'); } catch { return; }
+    try {
+      const role = this.roleOn('reviewer') ? 'reviewer' : 'lead';
+      const r = await this.call(ins, role, 'reflect', 'You review a closed paper trade for the user\'s strategy. Say why it won or lost in 1-2 sentences, then give ONE concrete rule to apply next time. Reply ONLY with JSON: {"why": "...", "next_time": "..."}',
+        `Strategy [[${s.name}]]:\n${s.body.slice(0, 1200)}\n\nTrade: ${t.side} ${t.asset} entry ${t.entry} stop ${t.stop} target ${t.takeProfit} exit ${t.exit} by ${t.reason}; result ${t.pnl} USD (${t.r}R); held ${f.hours.toFixed(1)}h; best +${f.mfe}R, worst ${f.mae}R; fees ${(t.fees || 0).toFixed(2)} USD.\nThesis at entry: ${t.thesis || '(none)'}`, { maxTokens: 400 });
+      let v; try { v = parseJSON(r.text); } catch { v = { why: r.text.slice(0, 300), next_time: '' }; }
+      const rel = this.lessonsPath(s.name), cur = V.readNote(this.vault, rel);
+      const add = `- Why (${r.model}): ${String(v.why || '').replace(/\n+/g, ' ')}\n${v.next_time ? `- Next time (${r.model}): ${String(v.next_time).replace(/\n+/g, ' ')}\n` : ''}`;
+      const at = cur.body.lastIndexOf(`## ${title}`);
+      if (at < 0) return;
+      const end = cur.body.indexOf('\n## ', at + 3);
+      const body = end < 0 ? cur.body.trimEnd() + '\n' + add : cur.body.slice(0, end).trimEnd() + '\n' + add + cur.body.slice(end);
+      V.writeNote(this.vault, rel, cur.data, body);
+    } finally { await closeInstruction(this.config, ins); }
+  }
+  /** The latest lesson entries, as text for prompts and as items for the UI. */
+  lessons(name, n = 8) {
+    let body; try { body = V.readNote(this.vault, this.lessonsPath(name)).body; } catch { return []; }
+    return body.split(/\n(?=## )/).filter(b => b.startsWith('## ')).slice(-n).map(b => {
+      const [head, ...lines] = b.split('\n');
+      return { title: head.slice(3).trim(), lines: lines.filter(l => l.startsWith('- ')).map(l => l.slice(2)) };
+    });
+  }
+  lessonsText(name, n = 6) {
+    return this.lessons(name, n).map(e => `### ${e.title}\n${e.lines.filter(l => !l.startsWith('Thesis')).map(l => `- ${l}`).join('\n')}`).join('\n').slice(-3500);
   }
 
   handleRiskEvent(s, ev) {
@@ -316,6 +377,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
         const acc = live ? live.account : this.account(s.name);
         const prices = {};
         for (const a of new Set([...s.assets, ...Object.keys(acc.positions)])) prices[a] = live ? (await K.ticker(a)).bid : await getPrice(a);
+        T.trackExcursion(acc, prices);
         if (live) {
           for (const t of await L.syncLive({ creds: this.creds(), live, rules, prices })) this.recordClose(s, t);
           const rs = L.liveRiskState(live, prices, rules, now); if (rs) await this.handleLiveRisk(s, live, rs);
@@ -448,7 +510,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       for (const a of Object.keys(lv.account.positions)) { try { lp[a] = (await K.ticker(a)).bid; } catch { /* offline */ } }
       live = { ...lv, equity: +T.equity(lv.account, lp).toFixed(2), prices: lp, metrics: T.metrics(lv.account.trades, lv.allocationUsd) };
     }
-    return { ...meta, body, equity: +T.equity(acc, prices).toFixed(2), account: acc, prices, evaluation: T.evaluate(acc, this.rules()), promotion: this.state.promotions[name] || null,
+    return { ...meta, body, equity: +T.equity(acc, prices).toFixed(2), account: acc, prices, evaluation: T.evaluate(acc, this.rules()), promotion: this.state.promotions[name] || null, lessons: this.lessons(name, 10).reverse(),
       live, exchange: { connected: !!this.config.kraken } };
   }
 }

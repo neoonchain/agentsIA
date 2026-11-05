@@ -51,6 +51,7 @@ test('metrics: profit factor and drawdown', () => {
   const m = T.metrics([{ pnl: 200, r: 2 }, { pnl: -100, r: -1 }, { pnl: -100, r: -1 }, { pnl: 300, r: 3 }], 1000);
   assert.equal(m.count, 4); assert.equal(m.profitFactor, 2.5); assert.equal(m.winRate, 50);
   assert.equal(m.maxDrawdownPct, 16.67); assert.equal(m.totalPnl, 300);
+  assert.equal(T.metrics([{ pnl: 50 }, { pnl: 20 }], 1000).profitFactor, null); // no losses: not computable, never Infinity
 });
 
 test('paper broker sizes by risk, charges fees and closes at stop', () => {
@@ -109,6 +110,8 @@ test('evaluator requires every mark', () => {
   assert.equal(T.evaluate(acc, RULES).eligible, true);
   acc.proposals.offStrategy = 1;
   assert.equal(T.evaluate(acc, RULES).eligible, false);
+  acc.proposals.offStrategy = 0; acc.trades = [{ pnl: 300, r: 3 }, { pnl: 100, r: 1 }];
+  assert.equal(T.evaluate(acc, RULES).eligible, false); // all wins: profit factor undefined, so the mark is not passed
 });
 
 test('parseJSON handles fences, prose and braces inside strings', () => {
@@ -128,8 +131,8 @@ function freshApp(name) {
 const calls = [];
 function mock({ propose = { action: 'open', asset: 'BTC-USD', side: 'long', stop: 95, take_profit: 110, risk_pct: 1, thesis: 'breakout', links: ['2026-11-03 BTC long'] }, agree = true } = {}) {
   calls.length = 0;
-  setMockLLM(({ task, role, modelId }) => {
-    calls.push({ task, role, modelId });
+  setMockLLM(({ task, role, modelId, user }) => {
+    calls.push({ task, role, modelId, user });
     if (task === 'propose') return JSON.stringify(propose);
     if (task === 'review') return `Here you go: {"agree": ${agree}, "reason": "checked", "issues": ${agree ? '[]' : '["thesis rests on one candle"]'}}`;
     if (task === 'chart') return '{"assets": {"BTC-USD": {"trend": "up", "support": 95, "resistance": 105, "setup": "breakout"}}}';
@@ -137,6 +140,7 @@ function mock({ propose = { action: 'open', asset: 'BTC-USD', side: 'long', stop
     if (task === 'psychology') return '{"patterns": ["revenge trades"], "rules": ["2 losses = done"]}';
     if (task === 'revise') return 'Revised answer';
     if (task === 'scribe') return 'Clean scribe thesis.';
+    if (task === 'reflect') return '{"why": "Breakout failed on weak volume.", "next_time": "Require volume above average before entering."}';
     return 'Draft answer';
   });
 }
@@ -283,4 +287,30 @@ test('journal screenshots: saved as attachments, embedded for Obsidian, read bac
   setMockLLM(({ task, images }) => { seen.push({ task, n: images?.length || 0 }); return task === 'analyse' ? JSON.stringify({ summary: 's', strengths: [], weaknesses: [], strategy: null }) : '{"agree": true, "issues": [], "patterns": [], "rules": []}'; });
   await app.analyse();
   assert.equal(seen.find(x => x.task === 'analyse').n, 1);
+});
+
+test('learning loop: a closed trade writes a lesson that the next decision reads', async () => {
+  const app = freshApp('learn'); app.setConfig(updateConfig(app.config, { apiKey: 'k' })); mock();
+  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [] });
+  app.start('Range breakout');
+  await app.decide('Range breakout'); // opens long BTC @100, stop 95, tp 110
+  const acc = app.account('Range breakout');
+  acc.lastDecisionAt = new Date().toISOString();
+  setMockMarket({ prices: { 'BTC-USD': 103, 'ETH-USD': 50 }, candles: [] }); await app.tick(); // +0.6R in favour
+  setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50 }, candles: [] }); await app.tick();  // stopped
+  await Promise.all([...(app.pendingLessons || [])]);
+  const lessons = app.lessons('Range breakout');
+  assert.equal(lessons.length, 1);
+  assert.match(lessons[0].title, /BTC-USD long · -[\d.]+R · stop/);
+  assert.ok(lessons[0].lines.some(l => /in favour before failing/.test(l)), lessons[0].lines.join(' | '));
+  assert.ok(lessons[0].lines.some(l => /^Why \(.+\): Breakout failed/.test(l)));
+  assert.ok(lessons[0].lines.some(l => /^Next time/.test(l)));
+  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [] });
+  calls.length = 0;
+  await app.decide('Range breakout', { manual: true });
+  const lead = calls.find(c => c.task === 'propose');
+  assert.match(lead.user, /Lessons from this strategy's previous trades/);
+  assert.match(lead.user, /Require volume above average/);
+  const view = await app.strategyView('Range breakout');
+  assert.equal(view.lessons.length, 1);
 });
