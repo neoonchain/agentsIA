@@ -8,15 +8,15 @@
 <meta name="theme-color" content="#ffffff" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
 
 :root{
   --bg:#fff; --soft:#f3f4f6; --ink:#010521; --ink-2:#101638; --mute:#40455f; --mute-2:#6b7088; --faint:#868a9c;
   --line:#e7e8eb; --line-2:#d3d6de; --red:#ef4423; --red-soft:#fde8e3; --ok:#2f7d16;
   --blue:#0055ff; --blue-soft:#e5eeff; --sky:#97e6ff; --sky-2:#6fd8fb; --sky-soft:#e6f8ff; --lime:#def105; --lime-ink:#394d00;
-  --sans:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --gutter:clamp(20px,4.6vw,66px); --max:1440px; --nav:68px; --ease:cubic-bezier(.2,.7,.1,1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -32,7 +32,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 /* NAV */
 .nav{position:sticky;top:0;z-index:50;height:var(--nav);background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
 .nav .wrap{height:100%;display:flex;align-items:center;gap:24px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:24px;letter-spacing:-.03em}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:24px;letter-spacing:-.03em}
 .brand svg{width:30px;height:30px}
 .nav-links{display:flex;gap:clamp(18px,2.6vw,40px);margin-left:clamp(10px,2.2vw,34px);white-space:nowrap}
 .nav-links a{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;color:var(--ink-2)}
@@ -55,7 +55,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .pix{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hero .wrap{position:relative;height:100%;display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:86px;pointer-events:none}
 .hero .wrap>*{pointer-events:auto}
-.hero h1{font-size:clamp(48px,6.4vw,90px);line-height:.79;letter-spacing:-.065em;font-weight:800}
+.hero h1{font-size:clamp(50px,6.6vw,96px);line-height:.98;letter-spacing:-.045em;font-weight:300}
 .hero-side{max-width:390px;margin-bottom:0}
 .live{display:flex;align-items:center;gap:10px;margin-bottom:22px;font-size:11.5px;letter-spacing:.24em}
 .live i{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 3px rgba(222,241,5,.25);display:block;animation:blink 1.6s infinite}
@@ -88,13 +88,13 @@ section.sec{padding:130px 0 0}
 .sec-label i{width:7px;height:7px;background:var(--blue);display:block}
 .sec-label span{color:var(--faint);letter-spacing:.12em}
 .sec-head{display:grid;grid-template-columns:1fr 494px;gap:60px;align-items:end;margin-bottom:68px}
-.sec-head h2{font-size:clamp(36px,3.9vw,56px);line-height:.98;letter-spacing:-.055em;font-weight:800}
+.sec-head h2{font-size:clamp(34px,3.7vw,54px);line-height:1.04;letter-spacing:-.035em;font-weight:500}
 .sec-head p{max-width:440px;font-size:16px;line-height:1.65;color:var(--mute);padding-bottom:6px}
 
 /* INTRO */
 .intro{display:grid;grid-template-columns:350px 1fr;padding-top:130px}
 .intro .sec-label{margin-top:22px}
-.intro p{font-size:clamp(24px,2.35vw,34px);line-height:1.17;letter-spacing:-.02em;font-weight:400}
+.intro p{font-size:clamp(24px,2.35vw,34px);line-height:1.2;letter-spacing:-.025em;font-weight:300}
 .intro p span{color:var(--faint)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);margin-top:70px}
 .stat{padding:40px 28px 44px;border-left:1px solid var(--line)}
@@ -228,7 +228,7 @@ section.sec{padding:130px 0 0}
 
 /* TOKEN */
 .tok{display:grid;grid-template-columns:1fr 515px;gap:60px;align-items:end}
-.tok h2{font-size:clamp(36px,3.9vw,56px);line-height:.98;letter-spacing:-.055em;font-weight:800;padding-bottom:58px}
+.tok h2{font-size:clamp(34px,3.7vw,54px);line-height:1.04;letter-spacing:-.035em;font-weight:500;padding-bottom:58px}
 .tok-t>div{display:flex;justify-content:space-between;padding:19px 0;border-bottom:1px solid var(--line);font-size:16px;color:var(--ink-2)}
 .tok-t>div:first-child{border-top:1px solid var(--line)}
 .tok-t b{font-weight:400;color:var(--ink)}
@@ -362,7 +362,7 @@ footer{margin-top:120px;border-top:1px solid var(--line)}
         <rect x="5" y="22" width="5" height="5"/><rect x="22" y="22" width="5" height="5"/>
       </g>
       <circle cx="16" cy="16" r="7.5" fill="none" stroke="currentColor" stroke-width="1"/>
-      <text x="16" y="19.5" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="9" font-weight="500" fill="currentColor">A</text>
+      <text x="16" y="19.5" text-anchor="middle" font-family="Geist Mono,monospace" font-size="9" font-weight="500" fill="currentColor">A</text>
     </symbol>
   </defs>
 </svg>
@@ -629,7 +629,7 @@ function pixelWave(cv){
         const x=i*CELL, y=j*CELL, d=Math.abs(y-cy)/bw, n=hash(i,j);
         const fl = .5+.5*Math.sin(t*1.3+n*40);
         let v = 1-d + (n-.5)*.55 + (fl-.5)*.25;
-        if(mode==='hero' && y>H*.6 && x<W*.62) v-=.9;
+        if(mode==='hero' && y>H*.5 && x<W*.6) v-=.9*Math.min(1,(y-H*.5)/(H*.08));
         const hue=i/cols; if(v>.62){ctx.fillStyle=hue>.55?'#0055ff':'#101638';ctx.fillRect(x+3,y+3,13,13)}
         else if(v>.42){ctx.fillStyle=hue>.4?'#4d8dff':'#2a4dd0';ctx.fillRect(x+4,y+4,10,10)}
         else if(v>.22 && n>.45){ctx.fillStyle='#97e6ff';ctx.fillRect(x+6,y+6,6,6)}
