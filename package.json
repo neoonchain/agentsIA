@@ -4,9 +4,12 @@
   "description": "Local Obsidian trading journal + AI model team that paper trades and must beat your marks before real money.",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build:pages": "node scripts/build-web.mjs && node -e \"const fs=require('fs');fs.rmSync('app',{recursive:true,force:true});fs.cpSync('site/app','app',{recursive:true})\""
   }
 }

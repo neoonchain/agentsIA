@@ -1,38 +1,36 @@
-name: Website (GitHub Pages)
+name: Website app folder (GitHub Pages)
 
-# Builds the intro, the tour and the in-browser app into ./site and publishes it on GitHub Pages.
-# One-time setup: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# GitHub Pages publishes this branch's root folder. The intro (index.html), the tour (tour.html) and
+# assets/ are already there; this keeps app/ (the in-browser app, built from src/) up to date so
+# "Enter app" always opens the current version. Pushes made with GITHUB_TOKEN don't re-trigger workflows.
 on:
   push:
     branches: ['claude/awesome-franklin-mbyyfj', 'main']
-    paths: ['index.html', 'tour.html', 'assets/**', 'src/**', 'scripts/build-web.mjs', '.github/workflows/pages.yml']
+    paths: ['src/**', 'scripts/build-web.mjs', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: pages-app
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm test
-      - run: node scripts/build-web.mjs
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - run: npm run build:pages
+      - name: Commit app/ if it changed
+        run: |
+          git add app
+          if git diff --cached --quiet; then echo "app/ is up to date"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898599+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Rebuild app/ for GitHub Pages"
+          git push
