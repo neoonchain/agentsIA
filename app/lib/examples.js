@@ -1,9 +1,11 @@
-// Example journal: the real trades from Kairos's own paper tests (see the Track record on the website).
-// They are seeded into an empty vault so a new user sees what a filled journal looks like, are tagged
-// "example", and can be removed in one click.
+// Example journal: real trades from Kairos's own paper tests (see the Track record on the website).
+// Seeded into an empty vault so a new user sees what a filled journal looks like: the three annotated trades
+// of paper test 4 and the Dip buyer paper track (2 years of rules-based trades on real prices, continued
+// every day by the app). All tagged "example" and removable in one click.
 import fs from 'node:fs';
 import * as V from './vault.js';
-import { RUN6 } from './examples-run6.js';
+import { TRACK, TRACK_STATE, TRACK_DECISIONS } from './examples-dip.js';
+import { trackJournalEntry } from './dipbuyer.js';
 
 export const EXAMPLE_TAG = 'example';
 
@@ -36,32 +38,31 @@ export const EXAMPLES = [
 
 const isExample = t => (t.tags || []).includes(EXAMPLE_TAG);
 
-/** Paper test 6's trades as journal entries, with a factual note for each. */
-export function run6Trades() {
-  return RUN6.map(([asset, opened, entry, stop, target, exit, qty, pnl, r, reason, closed], k) => {
-    const hours = Math.round((Date.parse(closed + 'Z') - Date.parse(opened + 'Z')) / 3600000), win = pnl > 0;
-    return {
-      date: opened, asset, side: 'long', entry, stop, exit, size: qty, pnl, r, strategy: 'Range breakout', chart: `ex6-${String(k + 1).padStart(2, '0')}.webp`,
-      emotion: 'rules-based', tags: `example, paper-test-6, breakout, ${reason.replace(/\s+/g, '-')}`,
-      thesis: `Paper test 6, run by Kairos's rules on the app engine (a year no rule was tuned on). ${asset} closed above a 2-day range on 1.5x volume with the daily trend up; a buy limit waited for the retest of the range top and filled at ${entry}. Stop ${stop} at structure, target ${target} (2.5R).`,
-      psychology: 'No discretion: the rules entered, sized at 1% risk and exited. Brake checked every order.',
-      wentWell: win ? `- ${reason === 'take profit' ? 'Reached the 2.5R target' : 'Closed in profit'} after ${hours}h: ${pnl >= 0 ? '+' : ''}${pnl} USD (${r}R).` : '- The stop did its job: the loss stayed near 1R.',
-      wentWrong: win ? (r < 1 ? '- Gave back most of the move before the exit.' : '') : `- ${reason === 'stop' ? 'The breakout failed and the stop was hit' : `Closed by ${reason}`} after ${hours}h: ${pnl} USD (${r}R). Fees of 0.25-0.4% each side add about 0.2R to every loss.`,
-    };
-  });
+/** The Dip buyer paper track shipped with the app, as journal entries (each with its chart). */
+export function trackTrades() {
+  return TRACK.map(([asset, opened, closed, entry, stop, tp, exit, qty, pnl, r, why, days, ctx], k) => ({
+    ...trackJournalEntry({ asset, t: Date.parse(opened), entry, stop, tp, exit, qty, pnl, r, why, days, ctx }), chart: `dip-${String(k + 1).padStart(2, '0')}.webp`,
+  }));
 }
+export const trackState = () => JSON.parse(JSON.stringify(TRACK_STATE));
+const startTrack = state => { state.track = trackState(); (state.decisions ||= {})['Dip buyer'] = JSON.parse(JSON.stringify(TRACK_DECISIONS)); };
 
-/** Seed the examples once, into a journal that has never had any trades; vaults seeded before also get paper test 6. */
+/** Seed the examples once, into a journal that has never had any trades. Older seeded vaults move to v3:
+ *  paper test 6's trades (a strategy that lost) make way for the Dip buyer track, which keeps going day by day. */
 export function seedExamples(root, state) {
   if (!state.examples) {
     state.examples = V.listJournal(root).length ? 'skipped' : 'seeded';
     if (state.examples !== 'seeded') return false;
-    for (const t of [...EXAMPLES, ...run6Trades()]) V.createJournalTrade(root, t);
-    state.examplesVersion = 2; return true;
+    for (const t of [...EXAMPLES, ...trackTrades()]) V.createJournalTrade(root, t);
+    state.examplesVersion = 3; startTrack(state); return true;
   }
-  if (state.examples === 'seeded' && (state.examplesVersion || 1) < 2) {
-    for (const t of run6Trades()) V.createJournalTrade(root, t);
-    state.examplesVersion = 2; return true;
+  if (state.examples === 'seeded' && (state.examplesVersion || 1) < 3) {
+    for (const t of V.listJournal(root).filter(t => isExample(t) && (t.tags || []).includes('paper-test-6'))) {
+      fs.unlinkSync(V.resolveInVault(root, t.path));
+      if (t.image && t.image.startsWith('Attachments/')) try { fs.unlinkSync(V.resolveInVault(root, t.image)); } catch { /* already gone */ }
+    }
+    for (const t of trackTrades()) V.createJournalTrade(root, t);
+    state.examplesVersion = 3; startTrack(state); return true;
   }
   return false;
 }
@@ -90,7 +91,7 @@ export async function attachExampleCharts(root) {
   let n = 0;
   for (const t of V.listJournal(root).filter(isExample)) {
     if (t.image) continue;
-    const ex = [...EXAMPLES, ...run6Trades()].find(e => e.asset === t.asset && e.date.replace('T', ' ') === t.date.slice(0, 16));
+    const ex = [...EXAMPLES, ...trackTrades()].find(e => e.asset === t.asset && e.date.replace('T', ' ') === t.date.slice(0, 16));
     if (!ex || !ex.chart) continue;
     const base = t.path.split('/').pop().replace(/\.md$/, ''), rel = `Attachments/${base}.webp`;
     fs.writeFileSync(V.resolveInVault(root, rel), await loadChart(ex.chart));

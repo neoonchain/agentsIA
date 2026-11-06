@@ -9,6 +9,7 @@ import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
 import * as K from './kraken.js';
 import * as L from './live.js';
 import { seedExamples, attachExampleCharts } from './examples.js';
+import { dailyReadings, readingsText, stepTrack, trackJournalEntry, trackDecision, DIP_ASSETS, DAY } from './dipbuyer.js';
 import { RUN4_DECISIONS } from './examples-decisions.js';
 import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf, relayPoll } from './news.js';
 import { getCandles1m } from './market.js';
@@ -251,6 +252,8 @@ export class App {
         prices[a] = live ? (await K.ticker(a)).mid : await getPrice(a); charts[a] = candleSummary(await getCandles(a, 48));
         if (s.trend_filter === true) { try { const t = dailyTrend(await getDailyCandles(a, 60), prices[a]); if (t) trend[a] = t; } catch { /* no daily data: Brake can't judge the trend */ } }
       }
+      let readings = null; // daily strategies: the rule numbers, computed by code
+      if (s.timeframe === '1d') { try { const d = {}; for (const a of new Set(['BTC-USD', ...s.assets])) d[a] = await getDailyCandles(a, 300); readings = dailyReadings(d); } catch { /* no daily data */ } }
       T.trackExcursion(acc, prices);
       if (live) { const rs = L.liveRiskState(live, prices, rules); if (rs) await this.handleLiveRisk(s, live, rs); }
       else for (const ev of T.riskTick(acc, prices, rules)) this.handleRiskEvent(s, ev);
@@ -268,6 +271,7 @@ export class App {
         const shocks = this.news.recentShocks(s.assets, 3 * 3600000);
         if (shocks.length) ctxParts.push(`Price shocks in the last 3h: ${shocks.map(x => `${x.asset} ${x.movePct > 0 ? '+' : ''}${x.movePct}% in ${x.mins || 3} min, volume ${x.volX}x at ${new Date(x.t).toISOString().slice(11, 16)} UTC`).join('; ')}.`);
         if (Object.keys(trend).length) ctxParts.push(`Daily trend (Brake blocks longs where it says "against"): ${Object.entries(trend).map(([a, t]) => `${a} ${t.ok ? 'with the trend' : 'against the trend'} (20-day avg ${t.s20}, 50-day ${t.s50})`).join('; ')}.`);
+        if (readings) ctxParts.push(`Daily readings for this daily strategy (last completed day, computed by code with the strategy's own formulas; a "RULES SIGNAL" means every entry rule is met, you still check the news):\n${readingsText(readings)}`);
         const lessons = this.lessonsText(s.name, 6);
         if (lessons) ctxParts.push(`Lessons from this strategy's previous trades, written after each one closed. Apply them:\n${lessons}`);
         if (live) ctxParts.push('This strategy trades REAL money on Kraken: only "long" opens are possible. Prefer "hold" when the setup is not clean.');
@@ -506,8 +510,34 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   /* ---------- scheduler: exits every tick, decisions on each strategy's interval ---------- */
+  /** The Dip buyer paper track in the example journal: run the rules on every new completed day, add its trades. */
+  async trackTick(now = Date.now()) {
+    const tr = this.state.track;
+    if (!tr || this.state.examples !== 'seeded' || this.trackBusy) return [];
+    const lastDone = Math.floor(now / DAY) * DAY - DAY; // the last daily candle that has closed
+    if (tr.lastT >= lastDone || (this.trackTried && now - this.trackTried < 30 * 60000)) return [];
+    this.trackBusy = true; this.trackTried = now;
+    try {
+      const daily = {};
+      for (const a of DIP_ASSETS) { try { daily[a] = (await getDailyCandles(a, 300)).filter(c => c.t <= lastDone); } catch { /* coin without data today */ } }
+      if (!daily['BTC-USD']?.some(c => c.t === lastDone)) return []; // the exchange has not published yesterday's candle yet
+      const days = [], { trades } = stepTrack(tr, daily, lastDone, d => days.push(trackDecision(d)));
+      const dec = (this.state.decisions ||= {})['Dip buyer'] ||= [];
+      dec.unshift(...days.reverse()); dec.length = Math.min(dec.length, 60);
+      const added = [];
+      for (const t of trades) {
+        const recent = now - t.ctx.signalT < 3 * DAY ? this.news.relevant([t.asset], 2 * DAY, 3).map(h => h.title.slice(0, 120)) : [];
+        added.push(V.createJournalTrade(this.vault, trackJournalEntry(t, recent)));
+      }
+      if (trades.length) this.note(`Dip buyer paper track: ${trades.length} trade${trades.length > 1 ? 's' : ''} closed up to ${new Date(lastDone).toISOString().slice(0, 10)}`);
+      this.save();
+      return added;
+    } finally { this.trackBusy = false; }
+  }
+
   async tick(now = new Date()) {
     const out = [];
+    try { await this.trackTick(+now); } catch { /* the track waits for the next tick */ }
     const watched = this.strategies().filter(x => x.status === 'running' || this.liveOf(x.name) || Object.keys(this.state.accounts[x.name]?.positions || {}).length);
     for (const s of watched) {
       try {

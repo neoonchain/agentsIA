@@ -84,6 +84,7 @@ async function boot() {
   let newsBusy = false;
   setInterval(async () => { if (newsBusy) return; newsBusy = true; try { await app.newsTick(); } finally { newsBusy = false; } }, 30000);
   setTimeout(() => app.newsTick().catch(() => {}), 1500);
+  setTimeout(() => app.trackTick().catch(() => {}), 2500);
   addEventListener('pagehide', () => { vfs.flushAll(); });
   addEventListener('beforeunload', e => { if (vfs.pending()) { vfs.flushAll(); e.preventDefault(); } });
 

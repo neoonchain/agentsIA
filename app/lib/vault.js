@@ -128,6 +128,61 @@ Version 2, rewritten after Kairos's paper tests 1-8 (see [[Lessons/Range breakou
 - "Hold" is a decision. Most hours have no setup.
 `;
 
+
+const DIP_STRATEGY = `---
+name: Dip buyer
+status: stopped
+version: 1
+assets: [BTC-USD, ETH-USD, SOL-USD, XRP-USD, DOGE-USD, ADA-USD, LINK-USD, LTC-USD]
+timeframe: 1d
+risk_per_trade_pct: 1
+hours_utc: "00:00-23:59"
+interval_min: 240
+max_positions: 4
+trend_filter: false
+---
+
+# Dip buyer
+
+Buy a sharp one or two day dip in a coin that is in an uptrend, only while the whole market is healthy, and sell the bounce.
+Paper test 9 (2019 to today, real daily prices, fees included): about 3 trades in 4 win. The wins are small, so the losses must stay small too.
+Its paper track is in the journal (tag #paper-track) and on the Track record. Rules are fixed in code (src/lib/dipbuyer.js); the AI applies them and reads the news.
+
+## Market first
+- Trade only while BTC closes above its 200-day average and has not fallen more than 10% in 3 days. Otherwise hold everything: in 2022 this rule kept the strategy out of the crash.
+- Read the latest headlines (Argus). Skip a coin with fresh bad news of its own (a hack, a delisting, a lawsuit, an unlock): that dip is news, not noise.
+
+## Entry
+- The coin closes above its own 50-day average (uptrend) and RSI(2) closes under 15 (a sharp dip).
+- Buy with a limit order at that close, valid for the next day only. No chasing if it does not fill.
+- At most 4 positions open, at most 25% of the account in one coin, 1% of the account at risk.
+
+## Exit
+- Sell when a day closes back above the 10-day average (and at least +0.5% above entry), or at the target: 3 x ATR(14) above entry.
+- Stop 4 x ATR(14) below entry (between 3% and 20%). The stop is wide on purpose: dips often go a little further before they bounce.
+- Close anything still open after 10 days.
+
+## Discipline
+- "Hold" is the usual answer: most days have no dip in an uptrend.
+- Never average down and never move the stop lower.
+`;
+
+const DIP_LESSONS = `---
+strategy: Dip buyer
+tags: [lessons]
+---
+
+# Lessons · Dip buyer
+
+What paper test 9 taught it (8 coins, daily candles, Jan 2019 to Nov 2026).
+
+- The market filter carries the strategy. Without "BTC above its 200-day average" the same dips earned far less (profit factor 1.09 instead of 1.32, drawdown 11% instead of 8%) and lost 7% in 2022; with it, 2022 had no trades at all.
+- A high win rate needs small targets, so fees matter: limit orders for entries and exits (0.25%), not market orders (0.4%).
+- Three exits in four are "back above the 10-day average", most often after just 2 days. A dip that has not bounced after 10 days usually will not: the time stop cut those for -0.3R on average (-0.85R at worst).
+- Bad years exist: 2019 and 2024 lost money (63-67% wins, but the losses were bigger than the wins). The win rate alone does not make it profitable.
+- When BTC, ETH and SOL dip on the same day it is one bet, not three: in October 2026 all three hit the time stop together.
+`;
+
 /** The lessons Range breakout starts with: what Kairos's own paper tests taught it. */
 const STRATEGY_LESSONS = `---
 strategy: Range breakout
@@ -243,6 +298,8 @@ export function initVault(root) {
     ['Psychology/Anti-tilt rules.md', TILT],
     ['Strategies/Memecoin momentum.md', MEME],
     ['Lessons/Memecoin momentum.md', MEME_LESSONS],
+    ['Strategies/Dip buyer.md', DIP_STRATEGY],
+    ['Lessons/Dip buyer.md', DIP_LESSONS],
   ];
   for (const [rel, content] of seed) {
     const f = path.join(root, rel);

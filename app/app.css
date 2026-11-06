@@ -376,3 +376,9 @@ label.ri input{width:auto}
 .ds-no{margin:4px 0 0 18px;font-size:14px;color:var(--red)}
 .pos{color:#1f9d6c}.neg{color:var(--red)}
 @media (max-width:800px){.dec summary{grid-template-columns:1fr 24px}.dec-t,.dec-b,.dec-w{grid-column:1}.dec-x{grid-column:2;grid-row:1/4}}
+
+.track-line{display:flex;gap:10px;align-items:baseline;font-size:14px}
+.track-line .dot{width:8px;height:8px;border-radius:50%;background:var(--mute,#8d93ad);flex:none;transform:translateY(-1px)}
+.track-line .dot.on{background:#22c58b}
+.banner.track-line{border-color:var(--line);background:var(--card)}
+.track-line .lnk{color:var(--blue,#0055ff);white-space:nowrap;cursor:pointer}

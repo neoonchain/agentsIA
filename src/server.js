@@ -82,6 +82,7 @@ export async function start({ port = Number(process.env.PORT) || 4317, tickMs = 
   let newsBusy = false;
   const newsTimer = setInterval(async () => { if (newsBusy) return; newsBusy = true; try { await app.newsTick(); } catch (e) { console.error('news', e.message); } finally { newsBusy = false; } }, 30000);
   setTimeout(() => app.newsTick().catch(() => {}), 1500);
+  setTimeout(() => app.trackTick().catch(() => {}), 2500);
   server.on('close', () => { clearInterval(timer); clearInterval(newsTimer); });
   const addr = server.address();
   console.log(`Kairos running at http://localhost:${addr.port}/app  ·  vault: ${app.vault}`);

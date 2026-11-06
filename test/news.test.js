@@ -120,17 +120,18 @@ test('an empty vault gets the paper-test examples once; removing them is permane
   try {
     const app = new App();
     const j = V.listJournal(app.vault);
-    assert.equal(j.length, 40); assert.ok(j.every(t => t.tags.includes('example'))); // 3 annotated + 37 from paper test 6
-    assert.equal(j.filter(t => t.tags.includes('paper-test-6')).length, 37);
+    assert.equal(j.length, 83); assert.ok(j.every(t => t.tags.includes('example'))); // 3 annotated + 80 from the Dip buyer paper track
+    assert.equal(j.filter(t => t.tags.includes('paper-track')).length, 80);
+    assert.equal(app.state.examplesVersion, 3); assert.ok(app.state.track.lastT > 0);
     const ex = app.state.decisions['Range breakout'];
     assert.equal(ex.length, 10); assert.ok(ex.every(d => d.example)); assert.equal(ex.at(-1).outcome, 'opened'); // paper test 4, newest first
-    assert.equal(await app.chartsReady, 40); // every example gets its chart in Attachments/
+    assert.equal(await app.chartsReady, 83); // every example gets its chart in Attachments/
     const withCharts = V.listJournal(app.vault).filter(t => t.image);
-    assert.equal(withCharts.length, 40);
+    assert.equal(withCharts.length, 83);
     assert.ok(withCharts.every(t => /^Attachments\/.+\.webp$/.test(t.image)), JSON.stringify(withCharts.map(t => t.image)));
     assert.ok(V.readImage(app.vault, withCharts[0].image));
     const { removeExamples } = await import('../src/lib/examples.js');
-    assert.equal(removeExamples(app.vault), 40); app.state.examples = 'removed'; app.save();
+    assert.equal(removeExamples(app.vault), 83); app.state.examples = 'removed'; app.save();
     assert.equal(V.listJournal(new App().vault).length, 0); // reopening does not seed again
   } finally { process.env.KAIROS_EXAMPLES = '0'; }
 });

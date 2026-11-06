@@ -12,7 +12,8 @@ export const err = (status, message, code) => Object.assign(new Error(message), 
 export function createApi(app) {
   const routes = [
     ['GET', /^\/api\/status$/, async () => {
-      const journal = V.listJournal(app.vault);
+      const all = V.listJournal(app.vault), own = all.filter(t => !t.tags.includes('example'));
+      const journal = own.length ? own : all; // once you log trades, the numbers are yours alone
       const rules = app.rules();
       const strategies = app.strategies().map(s => {
         const acc = app.account(s.name), ev = T.evaluate(acc, rules);
@@ -28,13 +29,14 @@ export function createApi(app) {
         exits[why] = (exits[why] || 0) + 1;
       }
       const headlines = app.news.relevant(app.watchedAssets(), 24 * 3600000, 5).map(h => ({ title: h.title, source: h.source, time: h.time, url: h.url, coins: h.coins }));
-      return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length, examples: journal.filter(t => t.tags.includes('example')).length, recent: journal.slice(-5).reverse(), byAsset: Object.values(byAsset).sort((a, b) => b.n - a.n).map(a => ({ ...a, pnl: Math.round(a.pnl * 100) / 100 })), exits, headlines,
+      return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length, examples: all.length - own.length, statsFrom: own.length ? 'own' : all.length ? 'examples' : 'none', recent: journal.slice(-5).reverse(), byAsset: Object.values(byAsset).sort((a, b) => b.n - a.n).map(a => ({ ...a, pnl: Math.round(a.pnl * 100) / 100 })), exits, headlines,
         strategies, activity: app.activity.slice(0, 30), config: publicConfig(app.config) };
     }],
     ['GET', /^\/api\/settings$/, async () => publicConfig(app.config)],
     ['PUT', /^\/api\/settings$/, async (_, b) => { app.setConfig(updateConfig(app.config, b)); return publicConfig(app.config); }],
     ['GET', /^\/api\/journal$/, async () => V.listJournal(app.vault)],
     ['POST', /^\/api\/journal$/, async (_, b) => ({ path: V.createJournalTrade(app.vault, b) })],
+    ['GET', /^\/api\/track$/, async () => { const t = app.state.track, d = app.state.decisions?.['Dip buyer']?.find(x => x.track); return t && app.state.examples === 'seeded' ? { lastDay: new Date(t.lastT).toISOString().slice(0, 10), outcome: d?.outcome || null, why: d ? d.thesis.split('\n')[0] : '', holding: Object.keys(t.pos) } : null; }],
     ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
     ['GET', /^\/api\/news$/, async () => ({ items: app.news.items.slice(0, 120), shocks: app.news.shocks.slice(0, 30), status: app.news.status, watch: app.watchedAssets(),
