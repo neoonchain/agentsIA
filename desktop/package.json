@@ -38,7 +38,9 @@
         "from": "..",
         "to": ".",
         "filter": [
-          "index.html"
+          "index.html",
+          "tour.html",
+          "assets/**/*"
         ]
       }
     ],

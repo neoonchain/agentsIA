@@ -109,7 +109,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);outline-of
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,16px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;max-width:min(560px,92vw);opacity:0;transition:.2s;pointer-events:none;z-index:50}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .toast.err{background:var(--red)}
-dialog{border:1px solid var(--line-2);border-radius:12px;padding:0;width:min(760px,94vw);max-height:86vh}
+dialog{border:1px solid var(--line-2);border-radius:12px;padding:0;width:min(860px,94vw);max-height:88vh;margin:auto;inset:0;box-shadow:0 30px 80px rgba(1,5,33,.25)}
 dialog::backdrop{background:rgba(1,5,33,.35)}
 .dlg-h{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
 .x{font-size:24px;line-height:1;color:var(--mute)}
