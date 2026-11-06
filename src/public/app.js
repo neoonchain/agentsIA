@@ -5,7 +5,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 // coin logos (assets/coin-*.webp); unknown tickers just show text
 const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT']);
 const coinBase = a => String(a || '').split('-')[0].toUpperCase();
-const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="/assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
+const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="../assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
 const withCoin = a => `<span class="wc">${coin(a)}${esc(a)}</span>`;
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const fp = x => (typeof x === 'number' && Number.isFinite(x) ? (Math.abs(x) >= 1 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : Number(x.toPrecision(4)).toString()) : (x ?? '–'));
@@ -121,7 +121,7 @@ const views = {
     view.innerHTML = `
       <div class="head"><div><h1>Overview</h1><p>${settings.web ? `Vault: ${esc(settings.vaultLabel)}.` : `Vault: <span class="mono">${esc(s.vault)}</span> · open it in Obsidian as a vault.`}</p></div>
         <div class="row"><button class="btn" data-go="journal">Log a trade</button><button class="btn dark" data-go="ask">Ask the ${settings.mode === 'team' ? 'team' : 'model'}</button></div></div>
-      ${settings.web ? `<div class="banner info">Web version: running strategies trade on paper while this tab is open. For 24/7 paper trading and real money on Kraken, use the <a href="/tour#get">desktop app</a>.</div>` : ''}
+      ${settings.web ? `<div class="banner info">Web version: running strategies trade on paper while this tab is open. For 24/7 paper trading and real money on Kraken, use the <a href="../tour#get">desktop app</a>.</div>` : ''}
       ${free ? `<div class="banner ${settings.freeAvailable ? 'info' : ''}">${settings.freeAvailable ? `You have <b>${Math.max(settings.freeLimit - settings.freeUsed, 0)} of ${settings.freeLimit}</b> free instructions (Ask or Analyse). After that, and for paper trading, add your own OpenRouter API key in <a href="#team">Team</a>.` : `Add your OpenRouter API key in <a href="#team">Team</a> to use the models. Journaling works without it.`}</div>` : ''}
       ${views.examplesBanner(s.examples)}
       <div class="grid g4">
@@ -338,7 +338,7 @@ const views = {
       <div class="grid g2">
         <div class="card"><h2>How the models work</h2>
           <div class="row" style="margin:14px 0"><label class="check"><input type="radio" name="mode" value="team" ${c.mode === 'team' ? 'checked' : ''}> <b>Team</b>: each model takes a role and a second model reviews every trade</label></div>
-          <div class="row"><label class="check"><input type="radio" name="mode" value="solo" ${c.mode === 'solo' ? 'checked' : ''}> <b>Solo</b>: one model does everything</label><span class="mpick"><img class="mlogo" src="/assets/model-${esc(M[c.soloModel]?.logo || 'claude')}.webp" alt="" width="24" height="24"><select id="soloModel" style="width:auto">${opts(c.soloModel)}</select></span></div>
+          <div class="row"><label class="check"><input type="radio" name="mode" value="solo" ${c.mode === 'solo' ? 'checked' : ''}> <b>Solo</b>: one model does everything</label><span class="mpick"><img class="mlogo" src="../assets/model-${esc(M[c.soloModel]?.logo || 'claude')}.webp" alt="" width="24" height="24"><select id="soloModel" style="width:auto">${opts(c.soloModel)}</select></span></div>
           <label class="check" style="margin-top:16px"><input type="checkbox" id="web" ${c.webSearch ? 'checked' : ''}> Allow web search for Market context and Sentiment (extra OpenRouter cost)</label>
         </div>
         <div class="card"><h2>OpenRouter API key</h2><p class="sub" style="margin:8px 0 12px">${c.hasApiKey ? `Saved (${esc(c.apiKeyHint)}). Stored only on this computer in <span class="mono">~/.kairos/config.json</span>, never in the vault.` : c.freeAvailable ? `You are on the free trial: ${Math.max(c.freeLimit - c.freeUsed, 0)} of ${c.freeLimit} instructions left. Paper trading needs your own key.` : 'Needed to use the models. Get one at openrouter.ai/keys.'}</p>
@@ -346,12 +346,12 @@ const views = {
           ${c.web ? `<p class="sub" style="margin-top:16px">Vault: <b>${esc(c.vaultLabel)}</b></p><div class="row" style="margin-top:8px"><button class="btn sm" id="zipVault">Export vault (.zip)</button><button class="btn sm" id="switchVault">Use another place</button></div>`
             : `<label style="margin-top:16px">Vault folder<input id="vault" value="${esc(c.vaultPath)}"></label><button class="btn sm" id="saveVault" style="margin-top:8px">Change vault</button>`}</div>
       </div>
-      ${c.web ? `<div class="card" style="margin-top:16px"><h2>Kraken · real money</h2><p class="sub" style="margin-top:8px">Real money runs only in the <a href="/tour#get">desktop app</a>, so your Kraken key never sits in a web page.</p></div>` : `<div class="card" style="margin-top:16px"><h2>Kraken · real money</h2>
+      ${c.web ? `<div class="card" style="margin-top:16px"><h2>Kraken · real money</h2><p class="sub" style="margin-top:8px">Real money runs only in the <a href="../tour#get">desktop app</a>, so your Kraken key never sits in a web page.</p></div>` : `<div class="card" style="margin-top:16px"><h2>Kraken · real money</h2>
         <p class="sub" style="margin:8px 0 12px">${c.hasKraken ? `Connected (${esc(c.krakenHint)}), checked ${esc(String(c.krakenCheckedAt).slice(0, 10))}: can trade, cannot withdraw.` : 'On Kraken: Settings → API → Create key. Enable only <b>Query Funds</b>, <b>Query Open/Closed Orders & Trades</b>, <b>Create & Modify Orders</b> and <b>Cancel/Close Orders</b>. Never enable Withdraw: the app refuses keys that can.'} Keys stay on this computer only.</p>
         <div class="row"><input id="krKey" placeholder="API key" autocomplete="off" style="flex:1"><input id="krSecret" type="password" placeholder="Private key" autocomplete="off" style="flex:1"><button class="btn dark" id="saveKr" data-busy="Checking key">Connect</button>${c.hasKraken ? '<button class="btn red" id="delKr">Remove</button>' : ''}</div></div>`}
       <div class="card" style="margin-top:16px"><h2>Roles</h2><p class="sub" style="margin:6px 0 12px">Used in Team mode. Lead is always on. Brake (risk) is code, not a model.</p>
         <div class="tblwrap"><table><tr><th>On</th><th>Role</th><th>What it does</th><th>Model</th></tr>
-        ${Object.entries(R).map(([k, r]) => `<tr><td><input type="checkbox" data-role-on="${k}" ${c.enabledRoles[k] ? 'checked' : ''} ${k === 'lead' ? 'disabled' : ''} style="width:auto"></td><td><b>${esc(r.label)}</b></td><td class="sub">${esc(r.desc)}</td><td><span class="mpick"><img class="mlogo" src="/assets/model-${esc(M[c.roles[k]]?.logo || 'claude')}.webp" alt="" width="24" height="24"><select data-role="${k}">${opts(c.roles[k])}</select></span></td></tr>`).join('')}</table></div></div>
+        ${Object.entries(R).map(([k, r]) => `<tr><td><input type="checkbox" data-role-on="${k}" ${c.enabledRoles[k] ? 'checked' : ''} ${k === 'lead' ? 'disabled' : ''} style="width:auto"></td><td><b>${esc(r.label)}</b></td><td class="sub">${esc(r.desc)}</td><td><span class="mpick"><img class="mlogo" src="../assets/model-${esc(M[c.roles[k]]?.logo || 'claude')}.webp" alt="" width="24" height="24"><select data-role="${k}">${opts(c.roles[k])}</select></span></td></tr>`).join('')}</table></div></div>
       <details class="card soft" style="margin-top:16px"><summary style="cursor:pointer;font-weight:600">OpenRouter model IDs</summary><div class="form" style="margin-top:12px">
         ${Object.entries(M).map(([k, m]) => `<label>${esc(m.label)}<input data-model="${k}" value="${esc(c.models[k])}" class="mono"></label>`).join('')}</div>
         <button class="btn sm" id="saveIds" style="margin-top:12px">Save model IDs</button></details>`;
@@ -443,7 +443,7 @@ function liveCard(s) {
   const l = s.live, on = l && l.enabled;
   const head = `<div class="head" style="margin-bottom:10px"><div><h3>Real money · Kraken spot ${on ? (l.mode === 'real' ? '<span class="chip ok">live · real</span>' : '<span class="chip run">validate mode</span>') : ''}</h3>
     <p class="sub" style="margin-top:6px">Long only, no leverage. Every buy gets a stop-loss order on Kraken. Brake checks liquidity and spread before each buy; memecoins included if Kraken lists them.</p></div>`;
-  if (settings.web) return `<div class="card" style="margin-top:16px">${head}</div><div class="banner info">Approved. Real money runs only in the <a href="/tour#get">desktop app</a>: open this vault there to go live on Kraken.</div></div>`;
+  if (settings.web) return `<div class="card" style="margin-top:16px">${head}</div><div class="banner info">Approved. Real money runs only in the <a href="../tour#get">desktop app</a>: open this vault there to go live on Kraken.</div></div>`;
   if (!s.exchange.connected) return `<div class="card" style="margin-top:16px">${head}</div><div class="banner info">Connect a Kraken API key in <a href="#team">Team</a> first (trade-only, no withdrawals).</div></div>`;
   if (!on) return `<div class="card" style="margin-top:16px">${head}<div class="row"><button class="btn" data-live="validate" data-busy="Checking">Go live · validate mode</button><button class="btn dark" data-live="real" data-busy="Checking">Go live · real money</button></div></div>
     <p class="sub">${l?.stoppedReason ? `Last live run stopped: ${esc(l.stoppedReason)}. ` : ''}Validate mode sends every order to Kraken for checking but executes nothing. Start there.</p></div>`;
