@@ -2,6 +2,11 @@
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// coin logos (assets/coin-*.webp); unknown tickers just show text
+const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT']);
+const coinBase = a => String(a || '').split('-')[0].toUpperCase();
+const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="/assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
+const withCoin = a => `<span class="wc">${coin(a)}${esc(a)}</span>`;
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const fp = x => (typeof x === 'number' && Number.isFinite(x) ? (Math.abs(x) >= 1 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : Number(x.toPrecision(4)).toString()) : (x ?? '–'));
 /** Small samples show counts, not a misleading percentage. */
@@ -182,10 +187,10 @@ const views = {
       ${trades.length ? `<div class="row jfilter" id="jfilter">${[['all', 'All'], ['wins', `Wins · ${wins.length}`], ['losses', `Losses · ${losses.length}`], ['shots', 'With screenshot']].map(([k, l]) => `<button class="chipbtn ${filt === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>` : ''}
       <div class="jgrid">${shown.map(t => `
         <article class="jcard ${t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : ''}" data-note="${esc(t.path)}">
-          <div class="jthumb" ${t.image ? `data-img="${esc(t.image)}"` : ''}>${t.image ? '' : `<span class="jph">${esc(t.asset.split('-')[0] || '—')}</span>`}
+          <div class="jthumb" ${t.image ? `data-img="${esc(t.image)}"` : ''}>${t.image ? '' : `<span class="jph">${coin(t.asset, 56) || esc(t.asset.split('-')[0] || '—')}</span>`}
             <span class="jside ${t.side}">${esc(t.side)}</span></div>
           <div class="jbody">
-            <div class="row" style="justify-content:space-between"><b>${esc(t.asset)}</b><span class="num ${cls(t.pnl)}">${money(t.pnl)}${t.r != null ? ` · ${t.r > 0 ? '+' : ''}${t.r}R` : ''}</span></div>
+            <div class="row" style="justify-content:space-between"><b>${withCoin(t.asset)}</b><span class="num ${cls(t.pnl)}">${money(t.pnl)}${t.r != null ? ` · ${t.r > 0 ? '+' : ''}${t.r}R` : ''}</span></div>
             <p class="sub">${esc(t.date)}${t.strategy ? ` · ${esc(t.strategy)}` : ''}</p>
             ${t.thesis ? `<p class="jthesis">${esc(t.thesis.slice(0, 120))}${t.thesis.length > 120 ? '…' : ''}</p>` : ''}
             <div class="row" style="gap:6px">${t.emotion ? `<span class="chip">${esc(t.emotion.slice(0, 28))}</span>` : ''}${t.tags.slice(0, 3).map(x => `<span class="chip">#${esc(x)}</span>`).join('')}</div>
@@ -268,13 +273,13 @@ const views = {
       <div class="head"><div><h1>Argus</h1><p>The watcher with a hundred eyes: news and price shocks, checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
         <button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Notifications on' : 'Turn on notifications'}</button></div>
       <div class="grid g2">
-        <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${esc(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
+        <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${withCoin(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
           ${Object.keys(d.guards).length ? `<p class="sub" style="margin-top:10px">Guard active: ${Object.entries(d.guards).map(([a, g]) => `${esc(a)} until ${new Date(g.until).toLocaleTimeString()}`).join(' · ')}</p>` : ''}
-          <p class="sub" style="margin-top:12px">Watching: ${d.watch.map(a => `<span class="chip">${esc(a)}</span>`).join(' ')}</p></div>
+          <p class="sub" style="margin-top:12px">Watching: ${d.watch.map(a => `<span class="chip">${withCoin(a)}</span>`).join(' ')}</p></div>
         <div class="card"><h3>Sources</h3><div class="srcs">${Object.entries(d.status).map(([k, s]) => `<div><span class="dot ${s.ok ? 'ok' : 'bad'}"></span><b>${esc(k)}</b><span class="sub">${s.ok ? `checked ${agoS(s.at)} ago` : esc(s.error)}</span></div>`).join('') || '<p class="empty">Starting…</p>'}</div></div>
       </div>
       <div class="row jfilter" style="margin-top:18px" id="nfilter"><button class="chipbtn ${onlyWatched ? 'on' : ''}" data-o="1">Watched coins</button><button class="chipbtn ${onlyWatched ? '' : 'on'}" data-o="0">Everything</button><span class="sub">${items.length} items</span></div>
-      <div class="feedlist">${items.slice(0, 80).map(i => `<a class="nitem" ${i.url ? `href="${esc(i.url)}" target="_blank" rel="noopener noreferrer"` : ''}><span class="t mono">${agoS(i.time)}</span><span class="s">${esc(i.source)}</span><span class="h">${esc(i.title)}</span><span class="c">${i.coins.map(c => `<span class="chip ${watch.has(c) ? 'ok' : ''}">${esc(c)}</span>`).join('')}</span></a>`).join('') || '<p class="empty">Nothing about the watched coins yet.</p>'}</div>
+      <div class="feedlist">${items.slice(0, 80).map(i => `<a class="nitem" ${i.url ? `href="${esc(i.url)}" target="_blank" rel="noopener noreferrer"` : ''}><span class="t mono">${agoS(i.time)}</span><span class="s">${esc(i.source)}</span><span class="h">${esc(i.title)}</span><span class="c">${i.coins.map(c => `<span class="chip ${watch.has(c) ? 'ok' : ''}">${withCoin(c)}</span>`).join('')}</span></a>`).join('') || '<p class="empty">Nothing about the watched coins yet.</p>'}</div>
       <div class="grid g2" style="margin-top:22px">
         <div class="card"><h3>Settings</h3>
           <label class="check" style="margin-top:10px"><input type="checkbox" id="nTree" ${ns.tree ? 'checked' : ''}> Tree of Alpha: tweets and headlines, seconds old, free</label>
@@ -381,7 +386,7 @@ async function renderStrategy(name) {
   const pos = Object.values(a.positions);
   box.innerHTML = `
     <div class="card"><div class="head" style="margin-bottom:12px"><div><h2>${esc(s.name)} ${chip({ ...s, paused: a.paused, promotion: p?.status })}</h2>
-      <p class="sub" style="margin-top:6px">${esc(s.assets.join(', '))} · hours ${esc(s.hours_utc || 'any')} UTC · risk ${esc(s.risk_per_trade_pct)}% · decides every ${esc(s.interval_min || 60)} min${a.lastDecisionAt ? ` · last decision ${agoText(a.lastDecisionAt)}` : ''}</p>
+      <p class="sub" style="margin-top:6px">${s.assets.map(withCoin).join(' ')} · hours ${esc(s.hours_utc || 'any')} UTC · risk ${esc(s.risk_per_trade_pct)}% · decides every ${esc(s.interval_min || 60)} min${a.lastDecisionAt ? ` · last decision ${agoText(a.lastDecisionAt)}` : ''}</p>
       ${a.paused ? `<p class="sub neg" style="margin-top:4px">Paused: ${esc(a.paused.reason)}</p>` : ''}</div>
       <div class="row">${running ? '<button class="btn" data-act="stop">Stop</button>' : `<button class="btn dark" data-act="start" ${s.draft ? 'disabled title="Draft: set draft: false in the note first"' : ''}>Start on paper</button>`}
         <button class="btn" data-act="run" data-busy="Deciding">Run a decision now</button>${pos.length ? '<button class="btn red" data-act="close-all">Close all & stop</button>' : '<button class="btn sm" data-act="reset">Reset account</button>'}
@@ -397,13 +402,13 @@ async function renderStrategy(name) {
         <div class="row" style="margin-top:14px">${p?.status === 'requested' ? `<span class="sub">Requested $${esc(p.tierUsd)} of real capital.</span><button class="btn dark sm" data-promo="approve">Approve</button><button class="btn sm" data-promo="reject">Reject</button>`
           : p?.status === 'approved' ? `<span class="chip ok">approved</span><span class="sub">$${esc(p.tierUsd)} tier approved. Go live in the Real money panel below.</span>`
           : `<button class="btn sm" data-promo="request" ${ev.eligible ? '' : 'disabled'}>Request real capital</button><span class="sub">${ev.eligible ? 'All marks beaten.' : 'Available once every mark is beaten.'}</span>`}</div></div>
-      <div class="card"><h3>Open positions</h3>${pos.length ? `<table style="margin-top:8px"><tr><th>Asset</th><th>Side</th><th>Entry</th><th>Stop</th><th>TP</th><th>Now</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${esc(x.asset)}</td><td>${esc(x.side)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)}</td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(s.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No open positions.</p>'}</div>
+      <div class="card"><h3>Open positions</h3>${pos.length ? `<table style="margin-top:8px"><tr><th>Asset</th><th>Side</th><th>Entry</th><th>Stop</th><th>TP</th><th>Now</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${withCoin(x.asset)}</td><td>${esc(x.side)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)}</td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(s.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No open positions.</p>'}</div>
     </div>
     ${p?.status === 'approved' || s.live ? liveCard(s) : ''}
     <div class="card lessons" style="margin-top:16px"><div class="row" style="justify-content:space-between"><h3>Lessons learned</h3><span class="sub">Written after every close · read before every decision · <a href="#" data-note="${esc('Lessons/' + s.name + '.md')}">open note</a></span></div>
       ${s.lessons?.length ? s.lessons.map(l => `<div class="lesson ${/· -/.test(l.title) ? 'loss' : 'win'}"><b class="mono">${esc(l.title)}</b><ul>${l.lines.filter(x => !x.startsWith('Thesis')).map(x => `<li>${md(x).replace(/<\/?p>/g, '')}</li>`).join('')}</ul></div>`).join('') : '<p class="empty">No closed trades yet. Each one will leave a lesson here.</p>'}</div>
     <div class="card" style="margin-top:16px"><h3>Closed paper trades</h3>${a.trades.length ? `<div class="tblwrap"><table style="margin-top:8px"><tr><th>Closed</th><th>Asset</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>R</th><th>Reason</th><th>Models</th></tr>
-      ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${esc(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
+      ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${withCoin(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
   box.querySelectorAll('[data-act]').forEach(b => (b.onclick = () => busy(b, async () => {
     const act = b.dataset.act;
     if ((act === 'close-all' || act === 'reset') && !confirm(act === 'reset' ? 'Reset this paper account? Its trades and evaluation start from zero.' : 'Close every open paper position at market and stop the strategy?')) return;
@@ -438,8 +443,8 @@ function liveCard(s) {
     ${l.account.paused ? `<div class="banner">Paused until tomorrow: ${esc(l.account.paused.reason)}</div>` : ''}
     <div class="grid g4"><div class="stat"><span class="eyebrow">Allocation</span><div class="n">$${esc(l.allocationUsd)}</div></div><div class="stat"><span class="eyebrow">Live equity</span><div class="n">$${l.equity.toLocaleString('en-US')}</div></div>
       <div class="stat"><span class="eyebrow">Live PnL</span><div class="n ${cls(m.totalPnl)}">${money(m.totalPnl)}</div></div><div class="stat"><span class="eyebrow">Live trades</span><div class="n">${m.count}</div></div></div>
-    ${pos.length ? `<table style="margin-top:14px"><tr><th>Asset</th><th>Qty</th><th>Entry</th><th>Stop on Kraken</th><th>TP</th><th>Bid</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${esc(x.asset)}</td><td class="num">${fp(x.qty)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)} <span class="sub">${esc(x.stopTxid || (x.mode === 'validate' ? 'simulated' : ''))}</span></td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(l.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No live positions.</p>'}
-    ${l.account.trades.length ? `<div class="tblwrap"><table style="margin-top:10px"><tr><th>Closed</th><th>Asset</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Reason</th></tr>${l.account.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${esc(t.asset)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td>${esc(t.reason)}</td></tr>`).join('')}</table></div>` : ''}</div>`;
+    ${pos.length ? `<table style="margin-top:14px"><tr><th>Asset</th><th>Qty</th><th>Entry</th><th>Stop on Kraken</th><th>TP</th><th>Bid</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${withCoin(x.asset)}</td><td class="num">${fp(x.qty)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)} <span class="sub">${esc(x.stopTxid || (x.mode === 'validate' ? 'simulated' : ''))}</span></td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(l.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No live positions.</p>'}
+    ${l.account.trades.length ? `<div class="tblwrap"><table style="margin-top:10px"><tr><th>Closed</th><th>Asset</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Reason</th></tr>${l.account.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${withCoin(t.asset)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td>${esc(t.reason)}</td></tr>`).join('')}</table></div>` : ''}</div>`;
 }
 
 function showDecision(r) {
