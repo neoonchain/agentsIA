@@ -95,23 +95,66 @@ Only you edit this file. The agents read it on every decision and the app never 
 const STRATEGY = `---
 name: Range breakout
 status: stopped
-assets: [BTC-USD, ETH-USD]
+version: 2
+assets: [BTC-USD, ETH-USD, SOL-USD]
 timeframe: 1h
 risk_per_trade_pct: 1
-hours_utc: "07:00-17:00"
+hours_utc: "00:00-23:59"
 interval_min: 60
+max_positions: 2
+trend_filter: true
 ---
 
 # Range breakout
 
-## Rules
-- Range of at least 2 days on the 1h chart.
-- Enter on a candle close outside the range with volume above the 20-candle average.
-- Stop on the other side of the last swing; take profit at 2R.
-- No trade after 2 losses in a row (see [[Anti-tilt rules]]).
+Buy a clean break out of a multi-day range, with the trend, and let the target do the work.
+Version 2, rewritten after Kairos's paper tests 1-8 (see [[Lessons/Range breakout]]).
 
-## What the journal says
-Works best during European hours. Big losses come from entering before the candle closes.
+## Entry
+- A range of at least 2 days on the 1h chart, between 3% and 12% tall: a real base, not a trend leg.
+- An hourly candle CLOSES above the range top, on its own volume of at least 1.5x the 72h average (not the daily average).
+- Never chase: skip it if the close is more than 1.5% above the range top, or if the move already ran between decisions.
+- Only with the trend: price above its 20-day average, and the 20-day above the 50-day. Brake blocks longs against it.
+- At most 2 positions open: BTC, ETH and SOL move together, so a third one adds risk, not diversification.
+
+## Exit
+- Stop at structure, at least 3% below entry (the middle of the range or lower). Fees (0.4% each side) make tighter stops cost ~1.4R.
+- Target 2.5R or more. No early exit "to be safe".
+- Only move the stop after +1.5R, and only under a real swing low with room for normal noise. Pulling it up under the last small dip cut both winners in paper test 4.
+- A breakout that goes nowhere for 7 days is closed.
+
+## Discipline
+- No trade after 2 losses in a row (see [[Anti-tilt rules]]).
+- "Hold" is a decision. Most hours have no setup.
+`;
+
+/** The lessons Range breakout starts with: what Kairos's own paper tests taught it. */
+const STRATEGY_LESSONS = `---
+strategy: Range breakout
+tags: [lessons]
+---
+# Lessons · Range breakout
+
+Seeded from Kairos's paper tests 1-8 (the Track record on the website). New lessons are added after every closed trade.
+
+## 2026-11-05 Paper test 1 · ETH long · -1.39R · stop
+- A wide candle on weekend volume (0.5x) closed above the base and failed: demand the breakout candle's own volume above average.
+- Fees of 0.4% each side took 39% of the planned risk on a 2.1% stop: stops of at least 3%, targets of at least 2.5R.
+
+## 2026-11-05 Paper tests 2 and 3 · 0 trades
+- Strict filters avoided every trap but caught nothing: when a setup meets the rules, take it; do not stack extra conditions on top.
+
+## 2026-11-06 Paper test 4 · SOL +0.31R, BTC -0.45R
+- Both entries were right; both stops were pulled up under the latest small dip. Left alone, SOL hit its 2.5R target.
+- Only protect after +1.5R, under a real swing low with room for noise.
+
+## 2026-11-06 Paper test 5 · a year of rules · 29 trades
+- Buying breakouts in a downtrend failed (8 losses of 9): only trade with the trend (price > 20-day average > 50-day).
+- BTC, ETH and SOL broke out in the same hour and tripled the risk: at most 2 positions open.
+
+## 2026-11-06 Paper tests 6-8 · limit orders, daily trend, 12% limit
+- Limit orders cut fees by a third but did not create an edge. Looser drawdown limits only lost more before Brake stopped the strategy.
+- None of the tested versions has beaten the marks yet: live paper trading is the real test.
 `;
 
 const MEME = `---
@@ -169,6 +212,7 @@ export function initVault(root) {
     ['rules.md', RULES],
     ['Templates/Trade.md', TEMPLATE_TRADE],
     ['Strategies/Range breakout.md', STRATEGY],
+    ['Lessons/Range breakout.md', STRATEGY_LESSONS],
     ['Psychology/Anti-tilt rules.md', TILT],
     ['Strategies/Memecoin momentum.md', MEME],
   ];
@@ -176,6 +220,12 @@ export function initVault(root) {
     const f = path.join(root, rel);
     if (!fs.existsSync(f)) fs.writeFileSync(f, content);
   }
+  // Range breakout v2: upgrade the note only if the user never edited the original v1 text
+  const sf = path.join(root, 'Strategies/Range breakout.md');
+  try { const n = parse(fs.readFileSync(sf, 'utf8'));
+    if (!n.data.version && n.body.includes('Works best during European hours. Big losses come from entering before the candle closes.') && n.body.includes('take profit at 2R.')) {
+      const v2 = parse(STRATEGY); fs.writeFileSync(sf, stringify({ ...v2.data, status: n.data.status || 'stopped' }, v2.body));
+    } } catch { /* the user renamed or removed it */ }
   // add rules introduced in later versions to existing vaults, without touching the user's values
   const rf = path.join(root, 'rules.md'), cur = parse(fs.readFileSync(rf, 'utf8')), defaults = parse(RULES).data;
   const missing = Object.keys(defaults).filter(k => !(k in cur.data));

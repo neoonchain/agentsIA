@@ -145,7 +145,7 @@ function mock({ propose = { action: 'open', asset: 'BTC-USD', side: 'long', stop
     return 'Draft answer';
   });
 }
-setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [{ t: Date.now(), open: 99, high: 101, low: 98, close: 100, volume: 10 }] });
+setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [{ t: Date.now(), open: 99, high: 101, low: 98, close: 100, volume: 10 }] });
 
 test('team ask: reviewer disagreement triggers a revision; solo uses one model', async () => {
   const app = freshApp('ask'); app.setConfig(updateConfig(app.config, { apiKey: 'k' }));
@@ -182,12 +182,12 @@ test('team decision: opens a paper trade with a note when the reviewer agrees', 
   assert.equal(note.data.status, 'open'); assert.match(note.body, /\[\[2026-11-03 BTC long\]\]/);
   assert.match(note.body, /Clean scribe thesis/);
   // price hits the stop on the next tick → closed, note updated
-  setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50 }, candles: [] });
+  setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
   app.account('Range breakout').lastDecisionAt = new Date().toISOString();
   await app.tick();
   const closed = V.readNote(app.vault, pos.notePath).data;
   assert.equal(closed.status, 'closed'); assert.ok(closed.pnl < 0);
-  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [] });
+  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
 });
 
 test('team decision: no agreement, no order; solo skips the reviewer', async () => {
@@ -216,11 +216,11 @@ test('stops are still watched on a stopped strategy; bad vault path is rolled ba
   const app = freshApp('watch'); app.setConfig(updateConfig(app.config, { apiKey: 'k' })); mock();
   await app.decide('Range breakout', { manual: true }); // strategy is stopped, manual decision opens a position
   assert.ok(app.account('Range breakout').positions['BTC-USD']);
-  setMockMarket({ prices: { 'BTC-USD': 90, 'ETH-USD': 50 }, candles: [] });
+  setMockMarket({ prices: { 'BTC-USD': 90, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
   await app.tick();
   assert.equal(Object.keys(app.account('Range breakout').positions).length, 0);
   assert.equal(calls.filter(c => c.task === 'propose').length, 1); // no new decision for a stopped strategy
-  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [] });
+  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
   const before = app.vault;
   fs.writeFileSync(path.join(tmp, 'afile'), 'x');
   assert.throws(() => app.setConfig(updateConfig(app.config, { vaultPath: path.join(tmp, 'afile', 'sub') })), /Cannot use/);
@@ -292,26 +292,53 @@ test('journal screenshots: saved as attachments, embedded for Obsidian, read bac
 
 test('learning loop: a closed trade writes a lesson that the next decision reads', async () => {
   const app = freshApp('learn'); app.setConfig(updateConfig(app.config, { apiKey: 'k' })); mock();
-  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [] });
+  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
   app.start('Range breakout');
   await app.decide('Range breakout'); // opens long BTC @100, stop 95, tp 110
   const acc = app.account('Range breakout');
   acc.lastDecisionAt = new Date().toISOString();
-  setMockMarket({ prices: { 'BTC-USD': 103, 'ETH-USD': 50 }, candles: [] }); await app.tick(); // +0.6R in favour
-  setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50 }, candles: [] }); await app.tick();  // stopped
+  setMockMarket({ prices: { 'BTC-USD': 103, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] }); await app.tick(); // +0.6R in favour
+  setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] }); await app.tick();  // stopped
   await Promise.all([...(app.pendingLessons || [])]);
-  const lessons = app.lessons('Range breakout');
-  assert.equal(lessons.length, 1);
-  assert.match(lessons[0].title, /BTC-USD long · -[\d.]+R · stop/);
-  assert.ok(lessons[0].lines.some(l => /in favour before failing/.test(l)), lessons[0].lines.join(' | '));
-  assert.ok(lessons[0].lines.some(l => /^Why \(.+\): Breakout failed/.test(l)));
-  assert.ok(lessons[0].lines.some(l => /^Next time/.test(l)));
-  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50 }, candles: [] });
+  const lessons = app.lessons('Range breakout'), last = lessons.at(-1);
+  assert.equal(lessons.length, 6); // 5 seeded from the paper tests + this trade
+  assert.match(lessons[0].title, /Paper test 1/);
+  assert.match(last.title, /BTC-USD long · -[\d.]+R · stop/);
+  assert.ok(last.lines.some(l => /in favour before failing/.test(l)), last.lines.join(' | '));
+  assert.ok(last.lines.some(l => /^Why \(.+\): Breakout failed/.test(l)));
+  assert.ok(last.lines.some(l => /^Next time/.test(l)));
+  setMockMarket({ prices: { 'BTC-USD': 100, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
   calls.length = 0;
   await app.decide('Range breakout', { manual: true });
   const lead = calls.find(c => c.task === 'propose');
   assert.match(lead.user, /Lessons from this strategy's previous trades/);
   assert.match(lead.user, /Require volume above average/);
   const view = await app.strategyView('Range breakout');
-  assert.equal(view.lessons.length, 1);
+  assert.equal(view.lessons.length, 6);
+});
+
+test('Range breakout v2: Brake enforces max positions and the trend filter; unedited v1 notes are upgraded', async () => {
+  const { dailyTrend } = await import('../src/lib/market.js');
+  const up = Array.from({ length: 60 }, (_, i) => ({ t: i * 864e5, open: 100 + i, high: 101 + i, low: 99 + i, close: 100 + i, volume: 1 }));
+  const down = up.map(c => ({ ...c, close: 200 - c.close }));
+  assert.equal(dailyTrend(up, 160).ok, true); assert.equal(dailyTrend(down, 100).ok, false); assert.equal(dailyTrend(up.slice(0, 20), 100), null);
+  const strategy = { assets: ['BTC-USD', 'ETH-USD', 'SOL-USD'], hours_utc: '00:00-23:59', risk_per_trade_pct: 1, max_positions: 2, trend_filter: true };
+  const acc = T.newAccount(RULES), p = a => ({ action: 'open', asset: a, side: 'long', stop: 90, take_profit: 125, risk_pct: 1 });
+  const against = { 'SOL-USD': { ok: false, s20: 110, s50: 120 } };
+  const v = T.brake(p('SOL-USD'), { strategy, rules: RULES, acc, price: 100, trend: against });
+  assert.equal(v.ok, false); assert.match(v.reasons.join(), /Trend filter/); assert.equal(v.offStrategy, true);
+  assert.equal(T.brake(p('BTC-USD'), { strategy, rules: RULES, acc, price: 100, trend: against }).ok, true); // no data for BTC: not blocked
+  T.openPosition(acc, { asset: 'BTC-USD', side: 'long', price: 100, stop: 90, riskPct: 1, rules: RULES });
+  T.openPosition(acc, { asset: 'ETH-USD', side: 'long', price: 100, stop: 90, riskPct: 1, rules: RULES });
+  assert.match(T.brake(p('SOL-USD'), { strategy, rules: RULES, acc, price: 100 }).reasons.join(), /strategy max 2/);
+  // an untouched v1 note is upgraded, an edited one is left alone
+  const V = await import('../src/lib/vault.js');
+  const dir = path.join(tmp, 'v1-upgrade'); V.initVault(dir);
+  const f = path.join(dir, 'Strategies/Range breakout.md');
+  const v1 = '---\nname: Range breakout\nstatus: running\nassets: [BTC-USD, ETH-USD]\n---\n\n# Range breakout\n\n## Rules\n- Stop on the other side of the last swing; take profit at 2R.\n\n## What the journal says\nWorks best during European hours. Big losses come from entering before the candle closes.\n';
+  fs.writeFileSync(f, v1); V.initVault(dir);
+  const n = V.readNote(dir, 'Strategies/Range breakout.md');
+  assert.equal(n.data.version, 2); assert.equal(n.data.status, 'running'); assert.equal(n.data.max_positions, 2); assert.equal(n.data.trend_filter, true);
+  fs.writeFileSync(f, v1.replace('take profit at 2R.', 'take profit at 3R. (my edit)')); V.initVault(dir);
+  assert.match(fs.readFileSync(f, 'utf8'), /my edit/);
 });

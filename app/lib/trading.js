@@ -131,7 +131,7 @@ export function riskTick(acc, prices, rules, now = new Date()) {
  * Check a model's proposal against the strategy and your rules.
  * offStrategy marks violations of the strategy itself (they count against adherence).
  */
-export function brake(proposal, { strategy, rules, acc, price, now = new Date(), mode, reviewerAgreed }) {
+export function brake(proposal, { strategy, rules, acc, price, now = new Date(), mode, reviewerAgreed, trend }) {
   const reasons = []; let offStrategy = false;
   const action = proposal?.action;
   if (action === 'hold') return { ok: true, reasons, offStrategy };
@@ -152,6 +152,10 @@ export function brake(proposal, { strategy, rules, acc, price, now = new Date(),
   const maxRisk = Math.min(Number(strategy.risk_per_trade_pct) || 1, Number(rules.max_risk_per_trade_pct) || 2);
   if (!(Number(proposal.risk_pct) > 0) || Number(proposal.risk_pct) > maxRisk) { reasons.push(`Risk must be >0 and ≤ ${maxRisk}%`); offStrategy = true; }
   if (acc.positions[proposal.asset]) reasons.push(`Already in a ${proposal.asset} position`);
+  const maxPos = Number(strategy.max_positions);
+  if (maxPos > 0 && Object.keys(acc.positions).length >= maxPos) reasons.push(`Already ${Object.keys(acc.positions).length} open positions (strategy max ${maxPos})`);
+  const tr = trend && trend[proposal.asset];
+  if (strategy.trend_filter === true && proposal.side === 'long' && tr && !tr.ok) { reasons.push(`Trend filter: ${proposal.asset} is not above its 20-day average (${tr.s20}) with the 20-day above the 50-day (${tr.s50})`); offStrategy = true; }
   if (acc.paused) reasons.push(`Paused: ${acc.paused.reason}`);
   if (mode === 'team' && reviewerAgreed === false) reasons.push('The reviewing model did not agree');
   return { ok: !reasons.length, reasons, offStrategy };

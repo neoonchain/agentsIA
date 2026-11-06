@@ -395,7 +395,7 @@ async function renderStrategy(name) {
   const pos = Object.values(a.positions);
   box.innerHTML = `
     <div class="card"><div class="head" style="margin-bottom:12px"><div><h2>${esc(s.name)} ${chip({ ...s, paused: a.paused, promotion: p?.status })}</h2>
-      <p class="sub" style="margin-top:6px">${s.assets.map(withCoin).join(' ')} · hours ${esc(s.hours_utc || 'any')} UTC · risk ${esc(s.risk_per_trade_pct)}% · decides every ${esc(s.interval_min || 60)} min${a.lastDecisionAt ? ` · last decision ${agoText(a.lastDecisionAt)}` : ''}</p>
+      <p class="sub" style="margin-top:6px">${s.assets.map(withCoin).join(' ')} · hours ${esc(s.hours_utc || 'any')} UTC · risk ${esc(s.risk_per_trade_pct)}% · decides every ${esc(s.interval_min || 60)} min${Number(s.max_positions) > 0 ? ` · max ${esc(s.max_positions)} open` : ''}${s.trend_filter === true ? ' · trend filter on' : ''}${a.lastDecisionAt ? ` · last decision ${agoText(a.lastDecisionAt)}` : ''}</p>
       ${a.paused ? `<p class="sub neg" style="margin-top:4px">Paused: ${esc(a.paused.reason)}</p>` : ''}</div>
       <div class="row">${running ? '<button class="btn" data-act="stop">Stop</button>' : `<button class="btn dark" data-act="start" ${s.draft ? 'disabled title="Draft: set draft: false in the note first"' : ''}>Start on paper</button>`}
         <button class="btn" data-act="run" data-busy="Deciding">Run a decision now</button>${pos.length ? '<button class="btn red" data-act="close-all">Close all & stop</button>' : '<button class="btn sm" data-act="reset">Reset account</button>'}

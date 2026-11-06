@@ -4,7 +4,7 @@ import path from 'node:path';
 import { loadConfig, saveConfig, MODELS } from './config.js';
 import * as V from './vault.js';
 import * as T from './trading.js';
-import { getPrice, getCandles, candleSummary, validAsset } from './market.js';
+import { getPrice, getCandles, getDailyCandles, dailyTrend, candleSummary, validAsset } from './market.js';
 import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
 import * as K from './kraken.js';
 import * as L from './live.js';
@@ -202,8 +202,11 @@ export class App {
       const live = this.liveOf(name);
       const acc = live ? live.account : this.account(name);
       if (!s.assets.length) throw new Error('Strategy has no assets');
-      const prices = {}, charts = {};
-      for (const a of s.assets) { prices[a] = live ? (await K.ticker(a)).mid : await getPrice(a); charts[a] = candleSummary(await getCandles(a, 48)); }
+      const prices = {}, charts = {}, trend = {};
+      for (const a of s.assets) {
+        prices[a] = live ? (await K.ticker(a)).mid : await getPrice(a); charts[a] = candleSummary(await getCandles(a, 48));
+        if (s.trend_filter === true) { try { const t = dailyTrend(await getDailyCandles(a, 60), prices[a]); if (t) trend[a] = t; } catch { /* no daily data: Brake can't judge the trend */ } }
+      }
       T.trackExcursion(acc, prices);
       if (live) { const rs = L.liveRiskState(live, prices, rules); if (rs) await this.handleLiveRisk(s, live, rs); }
       else for (const ev of T.riskTick(acc, prices, rules)) this.handleRiskEvent(s, ev);
@@ -220,6 +223,7 @@ export class App {
         if (heads.length) ctxParts.push(`Latest news about these assets (newest first; check timing against the candles, headlines can be stale or wrong):\n${heads.map(h => `- ${new Date(h.time).toISOString().slice(5, 16)} ${h.source}: ${h.title}`).join('\n')}`);
         const shocks = this.news.recentShocks(s.assets, 3 * 3600000);
         if (shocks.length) ctxParts.push(`Price shocks in the last 3h: ${shocks.map(x => `${x.asset} ${x.movePct > 0 ? '+' : ''}${x.movePct}% in ${x.mins || 3} min, volume ${x.volX}x at ${new Date(x.t).toISOString().slice(11, 16)} UTC`).join('; ')}.`);
+        if (Object.keys(trend).length) ctxParts.push(`Daily trend (Brake blocks longs where it says "against"): ${Object.entries(trend).map(([a, t]) => `${a} ${t.ok ? 'with the trend' : 'against the trend'} (20-day avg ${t.s20}, 50-day ${t.s50})`).join('; ')}.`);
         const lessons = this.lessonsText(s.name, 6);
         if (lessons) ctxParts.push(`Lessons from this strategy's previous trades, written after each one closed. Apply them:\n${lessons}`);
         if (live) ctxParts.push('This strategy trades REAL money on Kraken: only "long" opens are possible. Prefer "hold" when the setup is not clean.');
@@ -249,7 +253,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
         const price = prices[p.asset];
         let verdict = (p.action === 'open' && typeof price !== 'number')
           ? { ok: false, reasons: [`${p.asset} is not in the strategy`], offStrategy: true }
-          : T.brake(p, { strategy: s, rules, acc, price, mode: this.config.mode, reviewerAgreed });
+          : T.brake(p, { strategy: s, rules, acc, price, mode: this.config.mode, reviewerAgreed, trend });
         const guard = this.shockUntil[p.asset];
         if (p.action === 'open' && verdict.ok && guard && guard.until > Date.now() && s.on_shock !== 'allow') {
           verdict = { ok: false, reasons: [`Shock guard: ${p.asset} moved ${guard.movePct > 0 ? '+' : ''}${guard.movePct}% in ${guard.mins || 3} min; no new entries until ${new Date(guard.until).toISOString().slice(11, 16)} UTC`], offStrategy: false };

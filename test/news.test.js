@@ -80,7 +80,7 @@ test('a shock triggers an immediate decision, the guard blocks chasing, allow-st
   const V = await import('../src/lib/vault.js');
   for (const p of ['Strategies/Range breakout.md', 'Strategies/Memecoin momentum.md']) { const n = V.readNote(app.vault, p); V.writeNote(app.vault, p, { ...n.data, hours_utc: '00:00-23:59' }, n.body); }
   app.start('Range breakout'); app.start('Memecoin momentum');
-  setMockMarket({ prices: { 'BTC-USD': 81000, 'ETH-USD': 2400, 'DOGE-USD': 0.168, 'PEPE-USD': 0.000005, 'WIF-USD': 0.5, 'BONK-USD': 0.00002, 'SHIB-USD': 0.00001 }, candles: [],
+  setMockMarket({ prices: { 'BTC-USD': 81000, 'ETH-USD': 2400, 'SOL-USD': 150, 'DOGE-USD': 0.168, 'PEPE-USD': 0.000005, 'WIF-USD': 0.5, 'BONK-USD': 0.00002, 'SHIB-USD': 0.00001 }, candles: [],
     candles1m: { 'BTC-USD': candles(80000, 2.2, 4), 'DOGE-USD': candles(0.16, 6, 5) } });
   app.addNews({ title: 'BREAKING: Spot bitcoin ETF approvals expanded', source: 'test' });
   const r = await app.newsTick();

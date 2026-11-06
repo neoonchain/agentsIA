@@ -46,6 +46,30 @@ export async function getCandles(asset, limit = 48) {
   return v.slice(-limit);
 }
 
+/** Daily candles, oldest first (Coinbase, Kraken fallback). Used for the trend filter. */
+export async function getDailyCandles(asset, limit = 60) {
+  if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
+  if (mock) return (mock.daily?.[asset] || []).slice(-limit);
+  const hit = cache.get('d:' + asset);
+  if (hit && Date.now() - hit.t < 15 * 60000) return hit.v.slice(-limit);
+  let v;
+  try {
+    const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=86400`);
+    v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
+  } catch { v = await K.ohlc(asset, 1440); }
+  cache.set('d:' + asset, { t: Date.now(), v });
+  return v.slice(-limit);
+}
+
+/** With the trend: price above its 20-day average, and the 20-day above the 50-day. null without enough data. */
+export function dailyTrend(daily, price) {
+  if (!daily || daily.length < 51) return null;
+  const closes = daily.slice(-51, -1).map(c => c.close); // completed days only
+  const avg = n => closes.slice(-n).reduce((s, x) => s + x, 0) / n;
+  const s20 = avg(20), s50 = avg(50), p = price ?? daily.at(-1).close;
+  return { s20: +s20.toPrecision(6), s50: +s50.toPrecision(6), ok: p > s20 && s20 > s50 };
+}
+
 /** 1-minute candles, oldest first (Coinbase, Kraken fallback). Used by the shock detector. */
 export async function getCandles1m(asset, limit = 61) {
   if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
