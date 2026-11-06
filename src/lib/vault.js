@@ -160,27 +160,54 @@ Seeded from Kairos's paper tests 1-8 (the Track record on the website). New less
 const MEME = `---
 name: Memecoin momentum
 status: stopped
+version: 2
 assets: [DOGE-USD, PEPE-USD, WIF-USD, BONK-USD, SHIB-USD]
 timeframe: 1h
 risk_per_trade_pct: 0.5
 hours_utc: "00:00-23:59"
 interval_min: 30
 on_shock: allow
+max_positions: 1
+trend_filter: true
 ---
 
 # Memecoin momentum
 
 Memecoins move on attention. This strategy only trades coins Kraken lists against USD, never tokens that live only on a DEX (pump.fun and similar).
+Version 2, after Kairos's paper test 3 and the 8 Oct crash (see [[Lessons/Memecoin momentum]]). Not proven yet: paper trading decides.
 
-## Rules
-- Enter only with a catalyst: a fresh headline or tweet about the coin (news feed) AND a price shock with volume of at least 3x average.
+## Entry
+- Only with a catalyst: a fresh headline or tweet about the coin (Argus) AND an upward price shock, or a breakout candle with at least 3x its 72h volume.
+- Only with the trend: price above its 20-day average, and the 20-day above the 50-day. Brake blocks longs against it.
+- Never buy the bounce after a crash. Brake blocks entries for 15 minutes after a downward shock; after that, wait for a higher low on real volume.
 - Do not enter if the coin is already up more than 8% from where the catalyst started: that is chasing.
+- One memecoin position at a time (Brake enforces it).
+
+## Exit
 - Stop below the level where the move started (usually 4-8% away); target 3R; risk 0.5% (half the usual).
 - Close after 6 hours if the target has not been reached: memecoin moves fade.
-- Never more than one memecoin position at a time.
 
 ## Why the risk is smaller
-Spreads widen and volume vanishes fast. Brake also checks Kraken's 24h volume and spread before any real-money buy.
+Spreads widen and volume vanishes fast, and crashes come in steps. Brake also checks Kraken's 24h volume and spread before any real-money buy.
+`;
+
+/** The lessons Memecoin momentum starts with. */
+const MEME_LESSONS = `---
+strategy: Memecoin momentum
+tags: [lessons]
+---
+# Lessons · Memecoin momentum
+
+Seeded from Kairos's paper test 3 (DOGE, PEPE, WIF, 8-15 Oct 2026) and the replay of the 8 Oct crash. New lessons are added after every closed trade.
+
+## 2026-11-05 Paper test 3 · 0 trades · holding lost up to 14%
+- All three coins were in a 5-day downtrend: the only 3x volume candles were flushes down, not breakouts. No longs without the trend.
+- After the market-wide crash at 15:00 UTC the bounce came on below-average volume: a dead-cat bounce, not an entry.
+- WIF crossed its trigger on 1.2-1.7x volume and fell back a day later: the volume rule refused a losing chase.
+
+## 2026-11-05 8 Oct crash · replayed on 1-minute candles
+- The crash came down in steps (-4% over 25 minutes, never 3% in any 3 minutes) and kept falling 3-5.5% after the alert.
+- A shock down is a warning, never a buy signal.
 `;
 
 const TILT = `---
@@ -215,17 +242,22 @@ export function initVault(root) {
     ['Lessons/Range breakout.md', STRATEGY_LESSONS],
     ['Psychology/Anti-tilt rules.md', TILT],
     ['Strategies/Memecoin momentum.md', MEME],
+    ['Lessons/Memecoin momentum.md', MEME_LESSONS],
   ];
   for (const [rel, content] of seed) {
     const f = path.join(root, rel);
     if (!fs.existsSync(f)) fs.writeFileSync(f, content);
   }
-  // Range breakout v2: upgrade the note only if the user never edited the original v1 text
-  const sf = path.join(root, 'Strategies/Range breakout.md');
-  try { const n = parse(fs.readFileSync(sf, 'utf8'));
-    if (!n.data.version && n.body.includes('Works best during European hours. Big losses come from entering before the candle closes.') && n.body.includes('take profit at 2R.')) {
-      const v2 = parse(STRATEGY); fs.writeFileSync(sf, stringify({ ...v2.data, status: n.data.status || 'stopped' }, v2.body));
-    } } catch { /* the user renamed or removed it */ }
+  // v2 strategies: upgrade a note only if the user never edited the original v1 text (its status is kept)
+  for (const [rel, v2text, marks] of [
+    ['Strategies/Range breakout.md', STRATEGY, ['Works best during European hours. Big losses come from entering before the candle closes.', 'take profit at 2R.']],
+    ['Strategies/Memecoin momentum.md', MEME, ['Enter only with a catalyst: a fresh headline or tweet about the coin (news feed)', 'Never more than one memecoin position at a time.']],
+  ]) {
+    const sf = path.join(root, rel);
+    try { const n = parse(fs.readFileSync(sf, 'utf8'));
+      if (!n.data.version && marks.every(m => n.body.includes(m))) { const v2 = parse(v2text); fs.writeFileSync(sf, stringify({ ...v2.data, status: n.data.status || 'stopped' }, v2.body)); }
+    } catch { /* the user renamed or removed it */ }
+  }
   // add rules introduced in later versions to existing vaults, without touching the user's values
   const rf = path.join(root, 'rules.md'), cur = parse(fs.readFileSync(rf, 'utf8')), defaults = parse(RULES).data;
   const missing = Object.keys(defaults).filter(k => !(k in cur.data));

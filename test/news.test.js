@@ -131,3 +131,26 @@ test('an empty vault gets the paper-test examples once; removing them is permane
     assert.equal(V.listJournal(new App().vault).length, 0); // reopening does not seed again
   } finally { process.env.KAIROS_EXAMPLES = '0'; }
 });
+
+test('Memecoin momentum v2: never buys into a crash, one position, unedited v1 is upgraded', async () => {
+  const V = await import('../src/lib/vault.js');
+  const app = freshApp('meme-v2');
+  const n = V.readNote(app.vault, 'Strategies/Memecoin momentum.md');
+  assert.equal(n.data.version, 2); assert.equal(n.data.max_positions, 1); assert.equal(n.data.trend_filter, true);
+  assert.ok(app.lessons('Memecoin momentum').length >= 2);
+  app.start('Memecoin momentum');
+  setMockMarket({ prices: { 'BTC-USD': 81000, 'ETH-USD': 2400, 'SOL-USD': 150, 'DOGE-USD': 0.168, 'PEPE-USD': 0.000005, 'WIF-USD': 0.5, 'BONK-USD': 0.00002, 'SHIB-USD': 0.00001 }, candles: [] });
+  app.shockUntil['DOGE-USD'] = { until: Date.now() + 15 * 60000, movePct: -6, mins: 15 };
+  const down = await app.decide('Memecoin momentum', { manual: true });
+  assert.equal(down.verdict.ok, false); assert.match(down.verdict.reasons.join(), /Shock guard/);
+  app.shockUntil['DOGE-USD'] = { until: Date.now() + 15 * 60000, movePct: 6, mins: 3 };
+  const up = await app.decide('Memecoin momentum', { manual: true });
+  assert.equal(up.verdict.ok, true, up.verdict.reasons.join());
+  // an untouched v1 note is upgraded and keeps its status
+  const dir = path.join(tmp, 'meme-v1'); V.initVault(dir);
+  const f = path.join(dir, 'Strategies/Memecoin momentum.md');
+  fs.writeFileSync(f, '---\nname: Memecoin momentum\nstatus: running\non_shock: allow\n---\n\n## Rules\n- Enter only with a catalyst: a fresh headline or tweet about the coin (news feed) AND a price shock.\n- Never more than one memecoin position at a time.\n');
+  V.initVault(dir);
+  const m = V.readNote(dir, 'Strategies/Memecoin momentum.md');
+  assert.equal(m.data.version, 2); assert.equal(m.data.status, 'running');
+});

@@ -255,7 +255,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
           ? { ok: false, reasons: [`${p.asset} is not in the strategy`], offStrategy: true }
           : T.brake(p, { strategy: s, rules, acc, price, mode: this.config.mode, reviewerAgreed, trend });
         const guard = this.shockUntil[p.asset];
-        if (p.action === 'open' && verdict.ok && guard && guard.until > Date.now() && s.on_shock !== 'allow') {
+        if (p.action === 'open' && verdict.ok && guard && guard.until > Date.now() && (s.on_shock !== 'allow' || guard.movePct < 0)) { // momentum strategies may act on a shock up, never buy into a crash
           verdict = { ok: false, reasons: [`Shock guard: ${p.asset} moved ${guard.movePct > 0 ? '+' : ''}${guard.movePct}% in ${guard.mins || 3} min; no new entries until ${new Date(guard.until).toISOString().slice(11, 16)} UTC`], offStrategy: false };
         }
         if (live && p.action === 'open' && verdict.ok) {
