@@ -1,4 +1,4 @@
-# agentsIA free-trial proxy
+# Kairos free-trial proxy
 
 A small server that holds **your** OpenRouter key so it never ships inside the app. Each install gets 2 free instructions (Ask or Analyse). After that, users add their own key. No dependencies.
 
@@ -11,14 +11,14 @@ OPENROUTER_API_KEY=sk-or-... IP_SALT=$(openssl rand -hex 16) node proxy/server.j
 ## Deploy (Docker: any VPS, Fly.io, Render, Railway…)
 
 ```bash
-docker build -t agentsia-proxy proxy/
-docker run -d -p 8787:8787 -v agentsia-data:/data \
-  -e OPENROUTER_API_KEY=sk-or-... -e IP_SALT=<random> -e TRUST_PROXY=1 agentsia-proxy
+docker build -t kairos-proxy proxy/
+docker run -d -p 8787:8787 -v kairos-data:/data \
+  -e OPENROUTER_API_KEY=sk-or-... -e IP_SALT=<random> -e TRUST_PROXY=1 kairos-proxy
 ```
 
 Put it behind HTTPS. Most hosts do this for you; set `TRUST_PROXY=1` only when a load balancer sets `X-Forwarded-For`. Mount `/data` so usage survives restarts.
 
-Then point the app at it, either by setting `DEFAULT_FREE_PROXY` in `src/lib/config.js` before building the desktop app, or with `AGENTSIA_FREE_PROXY=https://your-proxy.example`.
+Then point the app at it, either by setting `DEFAULT_FREE_PROXY` in `src/lib/config.js` before building the desktop app, or with `KAIROS_FREE_PROXY=https://your-proxy.example`.
 
 ## Limits (environment variables)
 

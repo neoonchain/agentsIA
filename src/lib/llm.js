@@ -48,7 +48,7 @@ export async function chat(ins, { modelId, system, user, task, role, maxTokens =
   try {
     r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${ins.key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/neoonchain/agentsIA', 'X-Title': 'agentsIA' },
+      headers: { Authorization: `Bearer ${ins.key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/neoonchain/agentsIA', 'X-Title': 'Kairos' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(120000),
     });
   } catch (e) { ins.calls--; throw new Error(`Could not reach OpenRouter: ${e.message}`); }

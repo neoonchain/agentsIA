@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsia-live-'));
-process.env.AGENTSIA_HOME = path.join(tmp, 'home');
-process.env.AGENTSIA_VAULT = path.join(tmp, 'vault');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kairos-live-'));
+process.env.KAIROS_HOME = path.join(tmp, 'home');
+process.env.KAIROS_VAULT = path.join(tmp, 'vault');
 
 const K = await import('../src/lib/kraken.js');
 const V = await import('../src/lib/vault.js');
@@ -17,7 +17,7 @@ const { setMockLLM } = await import('../src/lib/llm.js');
 const { setMockMarket } = await import('../src/lib/market.js');
 
 /* ---------- fake Kraken: verifies signatures, keeps an order book of our orders ---------- */
-const SECRET = Buffer.from('test-secret-for-agentsia').toString('base64');
+const SECRET = Buffer.from('test-secret-for-kairos').toString('base64');
 const ex = { canWithdraw: false, usd: 1000, price: { 'XBTUSD': 100, 'PEPEUSD': 0.0000049 }, vol: 5e6, spread: 0.01, orders: {}, calls: [], seq: 0 };
 const PAIRS = {
   XXBTZUSD: { altname: 'XBTUSD', wsname: 'XBT/USD', base: 'XXBT', quote: 'ZUSD', lot_decimals: 8, pair_decimals: 1, tick_size: '0.1', ordermin: '0.00005', costmin: '0.5', status: 'online' },
@@ -54,7 +54,7 @@ const kraken = http.createServer(async (req, res) => {
 });
 
 let app, vn = 0;
-const freshVault = () => { process.env.AGENTSIA_VAULT = path.join(tmp, 'vault' + (++vn)); };
+const freshVault = () => { process.env.KAIROS_VAULT = path.join(tmp, 'vault' + (++vn)); };
 const RULES = { min_trades: 0, min_days: 0, min_profit_factor: 0, max_drawdown_pct: 8, daily_loss_pct: 3, min_adherence_pct: 0, max_risk_per_trade_pct: 2 };
 function proposal(over = {}) {
   setMockLLM(({ task }) => {

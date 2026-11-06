@@ -162,7 +162,9 @@ export function resolveInVault(root, rel) {
 export function initVault(root) {
   fs.mkdirSync(root, { recursive: true });
   for (const d of DIRS) fs.mkdirSync(path.join(root, d), { recursive: true });
-  fs.mkdirSync(path.join(root, '.agentsia'), { recursive: true });
+  fs.mkdirSync(path.join(root, '.kairos'), { recursive: true });
+  const oldState = path.join(root, '.agentsia', 'state.json'), state = path.join(root, '.kairos', 'state.json'); // vaults made as agentsIA
+  if (!fs.existsSync(state) && fs.existsSync(oldState)) fs.renameSync(oldState, state);
   const seed = [
     ['rules.md', RULES],
     ['Templates/Trade.md', TEMPLATE_TRADE],

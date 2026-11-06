@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsia-proxy-'));
-process.env.AGENTSIA_HOME = path.join(tmp, 'home');
-process.env.AGENTSIA_VAULT = path.join(tmp, 'vault');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kairos-proxy-'));
+process.env.KAIROS_HOME = path.join(tmp, 'home');
+process.env.KAIROS_VAULT = path.join(tmp, 'vault');
 
 const { createProxy, loadSettings } = await import('../proxy/server.js');
 const { App } = await import('../src/lib/core.js');
@@ -113,7 +113,7 @@ test('per-IP limit stops new install ids; daily budget pauses everyone; usage su
 
 test('the app uses the proxy for Ask, counts down, then asks for a key; trading never uses it', async () => {
   await startProxy();
-  process.env.AGENTSIA_FREE_PROXY = base;
+  process.env.KAIROS_FREE_PROXY = base;
   const app = new App();
   upstreamFail = true;
   await assert.rejects(app.ask('fails upstream'));
@@ -126,9 +126,9 @@ test('the app uses the proxy for Ask, counts down, then asks for a key; trading 
   assert.equal(app.config.freeRemaining, 0);
   await assert.rejects(app.ask('third'), e => e instanceof NeedKeyError);
   await assert.rejects(app.decide('Range breakout', { manual: true }), e => e.code === 'NEED_KEY');
-  const cfg = JSON.parse(fs.readFileSync(path.join(process.env.AGENTSIA_HOME, 'config.json'), 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync(path.join(process.env.KAIROS_HOME, 'config.json'), 'utf8'));
   assert.ok(!JSON.stringify(cfg).includes(OPERATOR));
   app.setConfig(updateConfig(app.config, { apiKey: 'sk-or-user' })); // own key bypasses the proxy entirely
-  delete process.env.AGENTSIA_FREE_PROXY;
+  delete process.env.KAIROS_FREE_PROXY;
   proxy.server.close();
 });

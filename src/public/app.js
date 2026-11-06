@@ -1,4 +1,4 @@
-// agentsIA workspace UI. Everything model- or vault-generated is escaped before rendering.
+// Kairos workspace UI. Everything model- or vault-generated is escaped before rendering.
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -35,12 +35,12 @@ async function compressImage(file) {
 }
 
 async function api(path, opts = {}) {
-  if (window.__agentsiaApi) { // web version: the engine runs in this tab
-    const r = await window.__agentsiaApi(opts.method || 'GET', '/api' + path, opts.body ? JSON.parse(JSON.stringify(opts.body)) : {});
+  if (window.__kairosApi) { // web version: the engine runs in this tab
+    const r = await window.__kairosApi(opts.method || 'GET', '/api' + path, opts.body ? JSON.parse(JSON.stringify(opts.body)) : {});
     if (r.status >= 400) { const e = new Error(r.body.error || 'Request failed'); e.code = r.body.code; e.status = r.status; throw e; }
     return JSON.parse(JSON.stringify(r.body));
   }
-  const r = await fetch('/api' + path, { ...opts, headers: { 'Content-Type': 'application/json', 'X-Agentsia': '1', ...(opts.headers || {}) },
+  const r = await fetch('/api' + path, { ...opts, headers: { 'Content-Type': 'application/json', 'X-Kairos': '1', ...(opts.headers || {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined });
   const j = await r.json().catch(() => ({ error: 'Bad response' }));
   if (!r.ok) { const e = new Error(j.error || 'Request failed'); e.code = j.code; e.status = r.status; throw e; }
@@ -265,7 +265,7 @@ const views = {
     const hookUrl = `${location.origin}/api/news/webhook`;
     const web = settings.web;
     view.innerHTML = `
-      <div class="head"><div><h1>News & shocks</h1><p>Checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
+      <div class="head"><div><h1>Argus</h1><p>The watcher with a hundred eyes: news and price shocks, checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
         <button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Notifications on' : 'Turn on notifications'}</button></div>
       <div class="grid g2">
         <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${esc(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
@@ -288,10 +288,10 @@ const views = {
           ${web ? '<p class="sub" style="margin-top:8px">The web version has no server to receive alerts. Use the desktop app for the incoming URL.</p>' : `
           <p class="sub" style="margin:8px 0 12px">Anything that can call a URL can feed the agents: a j7tracker → Telegram/Discord forwarder, TradingView alerts, n8n, Zapier. To receive from the internet, expose this computer with a tunnel (for example <span class="mono">cloudflared tunnel --url http://localhost:4317</span>) and use that address.</p>
           <label>URL<input readonly value="${esc(hookUrl)}" class="mono"></label>
-          <label>Token (header X-Agentsia-Token)<input readonly value="${esc(ns.webhookToken)}" class="mono"></label>
+          <label>Token (header X-Kairos-Token)<input readonly value="${esc(ns.webhookToken)}" class="mono"></label>
           <pre class="curl">curl -X POST ${esc(hookUrl)} \\
   -H "Content-Type: application/json" \\
-  -H "X-Agentsia-Token: ${esc(ns.webhookToken)}" \\
+  -H "X-Kairos-Token: ${esc(ns.webhookToken)}" \\
   -d '{"title":"$PEPE: big account just tweeted","source":"j7tracker"}'</pre>
           <div class="row"><button class="btn sm" id="nTest">Send a test alert</button><button class="btn sm" id="nRotate">New token</button></div>`}</div>
       </div>`;
@@ -327,7 +327,7 @@ const views = {
           <div class="row"><label class="check"><input type="radio" name="mode" value="solo" ${c.mode === 'solo' ? 'checked' : ''}> <b>Solo</b>: one model does everything</label><select id="soloModel" style="width:auto">${opts(c.soloModel)}</select></div>
           <label class="check" style="margin-top:16px"><input type="checkbox" id="web" ${c.webSearch ? 'checked' : ''}> Allow web search for Market context and Sentiment (extra OpenRouter cost)</label>
         </div>
-        <div class="card"><h2>OpenRouter API key</h2><p class="sub" style="margin:8px 0 12px">${c.hasApiKey ? `Saved (${esc(c.apiKeyHint)}). Stored only on this computer in <span class="mono">~/.agentsia/config.json</span>, never in the vault.` : c.freeAvailable ? `You are on the free trial: ${Math.max(c.freeLimit - c.freeUsed, 0)} of ${c.freeLimit} instructions left. Paper trading needs your own key.` : 'Needed to use the models. Get one at openrouter.ai/keys.'}</p>
+        <div class="card"><h2>OpenRouter API key</h2><p class="sub" style="margin:8px 0 12px">${c.hasApiKey ? `Saved (${esc(c.apiKeyHint)}). Stored only on this computer in <span class="mono">~/.kairos/config.json</span>, never in the vault.` : c.freeAvailable ? `You are on the free trial: ${Math.max(c.freeLimit - c.freeUsed, 0)} of ${c.freeLimit} instructions left. Paper trading needs your own key.` : 'Needed to use the models. Get one at openrouter.ai/keys.'}</p>
           <div class="row"><input id="key" type="password" placeholder="sk-or-..." autocomplete="off" style="flex:1"><button class="btn dark" id="saveKey">Save key</button>${c.hasApiKey ? '<button class="btn red" id="delKey">Remove</button>' : ''}</div>
           ${c.web ? `<p class="sub" style="margin-top:16px">Vault: <b>${esc(c.vaultLabel)}</b></p><div class="row" style="margin-top:8px"><button class="btn sm" id="zipVault">Export vault (.zip)</button><button class="btn sm" id="switchVault">Use another place</button></div>`
             : `<label style="margin-top:16px">Vault folder<input id="vault" value="${esc(c.vaultPath)}"></label><button class="btn sm" id="saveVault" style="margin-top:8px">Change vault</button>`}</div>
@@ -349,7 +349,7 @@ const views = {
     view.querySelectorAll('[data-role-on]').forEach(s => (s.onchange = () => save({ enabledRoles: { [s.dataset.roleOn]: s.checked } }, 'Role saved')));
     $('#saveKey').onclick = () => { const k = $('#key').value.trim(); if (!k) return toast('Paste a key first', true); save({ apiKey: k }, 'Key saved'); };
     if ($('#delKey')) $('#delKey').onclick = () => save({ apiKey: '' }, 'Key removed');
-    if ($('#zipVault')) { $('#zipVault').onclick = () => window.__agentsiaWeb.exportZip(); $('#switchVault').onclick = () => { if (confirm('Switch to another vault? This one stays where it is.')) window.__agentsiaWeb.switchVault(); }; }
+    if ($('#zipVault')) { $('#zipVault').onclick = () => window.__kairosWeb.exportZip(); $('#switchVault').onclick = () => { if (confirm('Switch to another vault? This one stays where it is.')) window.__kairosWeb.switchVault(); }; }
     if ($('#saveKr')) $('#saveKr').onclick = e => busy(e.currentTarget, async () => { settings = await api('/exchange', { method: 'PUT', body: { key: $('#krKey').value, secret: $('#krSecret').value } }); renderHeader(); toast('Kraken connected: trade only, no withdrawals'); render(); });
     if ($('#delKr')) $('#delKr').onclick = async () => { try { settings = await api('/exchange', { method: 'DELETE' }); toast('Kraken key removed'); render(); } catch (er) { fail(er); } };
     if ($('#saveVault')) $('#saveVault').onclick = () => save({ vaultPath: $('#vault').value }, 'Vault changed');
@@ -472,7 +472,7 @@ async function watchNews() {
     newsSeen = Math.max(newsSeen, latest);
     for (const msg of fresh) {
       toast(msg);
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('agentsIA', { body: msg });
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('Argus · Kairos', { body: msg });
     }
     if (fresh.length && current === 'news') render();
   } catch { /* server restarting */ }

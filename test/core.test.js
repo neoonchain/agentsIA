@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsia-'));
-process.env.AGENTSIA_HOME = path.join(tmp, 'home');
-process.env.AGENTSIA_VAULT = path.join(tmp, 'vault');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kairos-'));
+process.env.KAIROS_HOME = path.join(tmp, 'home');
+process.env.KAIROS_VAULT = path.join(tmp, 'vault');
 
 const { parse, stringify } = await import('../src/lib/frontmatter.js');
 const V = await import('../src/lib/vault.js');
@@ -121,8 +121,8 @@ test('parseJSON handles fences, prose and braces inside strings', () => {
 
 /* ---------- full app with mocked models and prices ---------- */
 function freshApp(name) {
-  process.env.AGENTSIA_VAULT = path.join(tmp, name);
-  process.env.AGENTSIA_HOME = path.join(tmp, name + '-home');
+  process.env.KAIROS_VAULT = path.join(tmp, name);
+  process.env.KAIROS_HOME = path.join(tmp, name + '-home');
   const app = new App();
   const n = V.readNote(app.vault, 'Strategies/Range breakout.md');
   V.writeNote(app.vault, 'Strategies/Range breakout.md', { ...n.data, hours_utc: '00:00-23:59' }, n.body);
@@ -239,11 +239,11 @@ test('promotion: request only when eligible, then approve', async () => {
 });
 
 test('HTTP API: host check, header check, journal round trip, errors', async () => {
-  process.env.AGENTSIA_VAULT = path.join(tmp, 'http'); process.env.AGENTSIA_HOME = path.join(tmp, 'http-home');
+  process.env.KAIROS_VAULT = path.join(tmp, 'http'); process.env.KAIROS_HOME = path.join(tmp, 'http-home');
   const { server } = createServer();
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const H = { 'Content-Type': 'application/json', 'X-Agentsia': '1' };
+  const H = { 'Content-Type': 'application/json', 'X-Kairos': '1' };
   try {
     assert.equal((await fetch(base + '/api/status')).status, 200);
     assert.equal((await fetch(base + '/app')).status, 200);

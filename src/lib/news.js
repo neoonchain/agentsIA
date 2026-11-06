@@ -60,7 +60,7 @@ async function getJSON(url, headers = {}) {
   return r.json();
 }
 async function getText(url) {
-  const r = await fetch(url, { headers: typeof window === 'undefined' ? { 'User-Agent': 'agentsia/0.1 (+news reader)' } : {}, signal: AbortSignal.timeout(10000) });
+  const r = await fetch(url, { headers: typeof window === 'undefined' ? { 'User-Agent': 'kairos/0.1 (+news reader)' } : {}, signal: AbortSignal.timeout(10000) });
   if (!r.ok) throw new Error(`${new URL(url).host} ${r.status}`);
   return r.text();
 }

@@ -12,7 +12,7 @@ import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf } from './ne
 import { getCandles1m } from './market.js';
 const px = L.fmtPx;
 
-const BASE = `You are part of agentsIA, a trading-journal assistant working from the user's own Obsidian vault.
+const BASE = `You are part of Kairos, a trading-journal assistant working from the user's own Obsidian vault.
 Be concrete and brief. Refer to notes as [[Note name]]. Never invent trades or numbers that are not in the data you are given.
 This is paper trading and journaling, not financial advice.`;
 
@@ -31,7 +31,7 @@ export class App {
   openVault() {
     this.vault = this.config.vaultPath;
     V.initVault(this.vault);
-    this.stateFile = path.join(this.vault, '.agentsia', 'state.json');
+    this.stateFile = path.join(this.vault, '.kairos', 'state.json');
     try { this.state = JSON.parse(fs.readFileSync(this.stateFile, 'utf8')); } catch { this.state = {}; }
     this.state.accounts ||= {}; this.state.promotions ||= {}; this.state.live ||= {};
   }
@@ -337,7 +337,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     const due = (k, ms) => !this.newsAt[k] || now - this.newsAt[k] >= ms;
     const cfg = this.config.news, jobs = [];
     if (cfg.tree && due('tree', 25000)) { this.newsAt.tree = now; jobs.push(this.news.poll('Tree of Alpha', () => NEWS.tree())); }
-    if (cfg.rss && !globalThis.AGENTSIA_WEB && due('rss', 120000)) { this.newsAt.rss = now; for (const u of DEFAULT_RSS) jobs.push(this.news.poll(new URL(u).hostname, () => NEWS.rss(u))); }
+    if (cfg.rss && !globalThis.KAIROS_WEB && due('rss', 120000)) { this.newsAt.rss = now; for (const u of DEFAULT_RSS) jobs.push(this.news.poll(new URL(u).hostname, () => NEWS.rss(u))); }
     if (cfg.x && this.config.xBearer && due('x', 60000)) { this.newsAt.x = now; jobs.push(this.news.poll('X API', () => NEWS.x(this.config.xBearer, cfg.xQuery))); }
     for (const fresh of await Promise.all(jobs)) for (const n of fresh) this.recordNews(n);
     // shocks on every watched asset
@@ -479,7 +479,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   async setKraken({ key, secret }) {
-    if (globalThis.AGENTSIA_WEB) throw Object.assign(new Error('Real money runs only in the desktop app, so your Kraken key never sits in a web page.'), { status: 400 });
+    if (globalThis.KAIROS_WEB) throw Object.assign(new Error('Real money runs only in the desktop app, so your Kraken key never sits in a web page.'), { status: 400 });
     key = String(key || '').trim(); secret = String(secret || '').trim();
     if (!key || !secret) throw Object.assign(new Error('Paste both the API key and the private key'), { status: 400 });
     const creds = { key, secret };
@@ -495,7 +495,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   async enableLive(name, { mode, confirm }) {
-    if (globalThis.AGENTSIA_WEB) throw Object.assign(new Error('Real money runs only in the desktop app. Download it from the landing page.'), { status: 400 });
+    if (globalThis.KAIROS_WEB) throw Object.assign(new Error('Real money runs only in the desktop app. Download it from the landing page.'), { status: 400 });
     const s = this.strategy(name), promo = this.state.promotions[name];
     if (promo?.status !== 'approved') throw Object.assign(new Error('Approve the promotion first'), { status: 400 });
     if (!this.config.kraken) throw Object.assign(new Error('Connect a Kraken key in Team settings first'), { status: 400, code: 'NEED_EXCHANGE' });

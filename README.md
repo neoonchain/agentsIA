@@ -1,4 +1,4 @@
-# agentsIA
+# Kairos
 
 A local trading journal in an Obsidian vault, plus AI models (Claude Opus 5.5, Fable 5.1, Sonnet 5.5, GPT-6.1 Terra, GPT-6 Astra, Gemini, Grok, all through OpenRouter) that learn from it and **paper trade** crypto. A strategy may only ask for real capital once it beats the marks you set, and you approve every step.
 
@@ -11,7 +11,7 @@ Open **/app** on the website: no install and no account. The same app and engine
 - **Your data:** your OpenRouter key and notes stay in your browser. Model calls go straight from your browser to OpenRouter.
 - **Paper trading** runs while the tab is open. For 24/7 trading and real money on Kraken, use the desktop app.
 
-**Deploying to Netlify:** connect the repository. `netlify.toml` runs `node scripts/build-web.mjs` and publishes `site/`. To offer the free trial on the web, set `AGENTSIA_FREE_PROXY` in Netlify's environment variables.
+**Deploying to Netlify:** connect the repository. `netlify.toml` runs `node scripts/build-web.mjs` and publishes `site/`. To offer the free trial on the web, set `KAIROS_FREE_PROXY` in Netlify's environment variables.
 
 ## Run it
 
@@ -91,11 +91,11 @@ npm test
 
 ## API keys and the free trial
 
-- Each user can add their own **OpenRouter** key in Team settings. It is stored in `~/.agentsia/config.json` (mode 600), never in the vault, and calls go straight to OpenRouter.
+- Each user can add their own **OpenRouter** key in Team settings. It is stored in `~/.kairos/config.json` (mode 600), never in the vault, and calls go straight to OpenRouter.
 - **Free trial**: users without a key get **2 free instructions** (Ask or Analyse) through the free-trial proxy in [`proxy/`](proxy/README.md). The proxy holds your OpenRouter key on your server, so it never ships inside the app, and it counts usage server-side.
-  - Point the app at your proxy with `AGENTSIA_FREE_PROXY=https://…`, or set `DEFAULT_FREE_PROXY` in `src/lib/config.js` before building the desktop app.
+  - Point the app at your proxy with `KAIROS_FREE_PROXY=https://…`, or set `DEFAULT_FREE_PROXY` in `src/lib/config.js` before building the desktop app.
 - Paper trading always needs the user's own key, because it runs on a schedule.
 
 ## Development
 
-`AGENTSIA_LLM=mock npm start` replaces the models with fake answers, so you can click through the whole app without spending credits. Never use it for real.
+`KAIROS_LLM=mock npm start` replaces the models with fake answers, so you can click through the whole app without spending credits. Never use it for real.

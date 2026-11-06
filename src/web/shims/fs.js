@@ -120,7 +120,7 @@ export function dirBackend(root) {
       const out = {};
       async function walk(dir, pre) {
         for await (const [name, h] of dir.entries()) {
-          if (name.startsWith('.') && name !== '.agentsia') continue; // skip .obsidian, .git, .trash…
+          if (name.startsWith('.') && name !== '.kairos' && name !== '.agentsia') continue; // skip .obsidian, .git, .trash…
           if (h.kind === 'directory') await walk(h, pre + name + '/');
           else if (TEXT.test(name)) out[pre + name] = await (await h.getFile()).text();
           else if (IMG.test(name)) out[pre + name] = new Uint8Array(await (await h.getFile()).arrayBuffer());

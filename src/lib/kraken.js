@@ -33,7 +33,7 @@ export async function privatePost(creds, method, params = {}) {
   const body = new URLSearchParams({ nonce: String(nonce), ...Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)])) }).toString();
   const r = await fetch(base() + path, {
     method: 'POST', signal: AbortSignal.timeout(15000),
-    headers: { 'API-Key': creds.key, 'API-Sign': sign(path, body, nonce, creds.secret), 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', 'User-Agent': 'agentsia/0.1' },
+    headers: { 'API-Key': creds.key, 'API-Sign': sign(path, body, nonce, creds.secret), 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', 'User-Agent': 'kairos/0.1' },
     body,
   });
   const j = await r.json().catch(() => ({}));
@@ -101,7 +101,7 @@ export async function quoteBalance(creds, quote = 'USD') {
 export async function checkKey(creds) {
   await balances(creds);
   try {
-    await privatePost(creds, 'WithdrawInfo', { asset: 'XBT', key: 'agentsia-permission-probe-does-not-exist', amount: '0.0001' });
+    await privatePost(creds, 'WithdrawInfo', { asset: 'XBT', key: 'kairos-permission-probe-does-not-exist', amount: '0.0001' });
     return { ok: false, reason: 'This key can withdraw funds. Create a new Kraken key with only Query Funds, Query/Create/Cancel Orders.' };
   } catch (e) {
     const errs = (e.errors || []).join(' ');

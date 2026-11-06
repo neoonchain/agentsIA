@@ -1,4 +1,4 @@
-// agentsIA free-trial proxy. Holds the operator's OpenRouter key so it never ships inside the app.
+// Kairos free-trial proxy. Holds the operator's OpenRouter key so it never ships inside the app.
 // Each install gets FREE_PER_INSTALL instructions; one instruction = a short-lived ticket allowing a few model calls.
 // No dependencies. Run: OPENROUTER_API_KEY=sk-or-... node proxy/server.js
 import http from 'node:http';
@@ -124,7 +124,7 @@ export function createProxy(S = loadSettings()) {
     try {
       r = await fetch(S.upstream, {
         method: 'POST', signal: AbortSignal.timeout(120000),
-        headers: { Authorization: `Bearer ${S.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/neoonchain/agentsIA', 'X-Title': 'agentsIA free trial' },
+        headers: { Authorization: `Bearer ${S.apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/neoonchain/agentsIA', 'X-Title': 'Kairos free trial' },
         // no plugins (web search costs extra), no tools, capped tokens; ask OpenRouter to report the cost
         body: JSON.stringify({ model: body.model, messages, max_tokens: maxTokens, usage: { include: true } }),
       });
@@ -184,6 +184,6 @@ function err(status, message, code) { return Object.assign(new Error(message), {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { server, store, settings } = createProxy();
-  server.listen(settings.port, settings.host, () => console.log(`agentsIA free-trial proxy on ${settings.host}:${settings.port} · ${settings.perInstall}/install, ${settings.perIp}/IP, $${settings.dailyBudgetUsd}/day`));
+  server.listen(settings.port, settings.host, () => console.log(`Kairos free-trial proxy on ${settings.host}:${settings.port} · ${settings.perInstall}/install, ${settings.perIp}/IP, $${settings.dailyBudgetUsd}/day`));
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { store.flush(); process.exit(0); });
 }

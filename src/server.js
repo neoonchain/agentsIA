@@ -33,7 +33,7 @@ export function createServer(app = new App()) {
     try {
       // Inbound news webhook: may come through a tunnel (any Host), so it is authorised by its own token instead.
       if (req.method === 'POST' && req.url.split('?')[0] === '/api/news/webhook') {
-        const given = String(req.headers['x-agentsia-token'] || new URL(req.url, 'http://x').searchParams.get('token') || '');
+        const given = String(req.headers['x-kairos-token'] || req.headers['x-agentsia-token'] || new URL(req.url, 'http://x').searchParams.get('token') || '');
         const want = app.config.news.webhookToken;
         const ok = given.length === want.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(want));
         if (!ok) return send(401, { error: 'Bad or missing token' });
@@ -57,7 +57,7 @@ export function createServer(app = new App()) {
       }
       if (!url.pathname.startsWith('/api/')) return send(404, { error: 'Not found' });
       // Cross-site pages cannot set custom headers without a CORS preflight, which we never allow.
-      if (req.method !== 'GET' && req.headers['x-agentsia'] !== '1') return send(403, { error: 'Missing X-Agentsia header' });
+      if (req.method !== 'GET' && req.headers['x-kairos'] !== '1') return send(403, { error: 'Missing X-Kairos header' });
       const body = req.method === 'GET' ? {} : await readBody(req);
       const r = await handle(req.method, url.pathname, url.searchParams, body);
       send(r.status, r.body);
@@ -80,15 +80,15 @@ export async function start({ port = Number(process.env.PORT) || 4317, tickMs = 
   setTimeout(() => app.newsTick().catch(() => {}), 1500);
   server.on('close', () => { clearInterval(timer); clearInterval(newsTimer); });
   const addr = server.address();
-  console.log(`agentsIA running at http://localhost:${addr.port}/app  ·  vault: ${app.vault}`);
+  console.log(`Kairos running at http://localhost:${addr.port}/app  ·  vault: ${app.vault}`);
   return { server, app, port: addr.port };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.env.AGENTSIA_LLM === 'mock') { // development only: fake model answers, no network, no key
+  if (process.env.KAIROS_LLM === 'mock') { // development only: fake model answers, no network, no key
     const { setMockLLM } = await import('./lib/llm.js');
     const { getPrice } = await import('./lib/market.js');
-    console.log('⚠ AGENTSIA_LLM=mock: model answers are fake (development only)');
+    console.log('⚠ KAIROS_LLM=mock: model answers are fake (development only)');
     setMockLLM(async ({ task, user }) => {
       const m = user.match(/## ([A-Z]+-[A-Z]+) price ([\d.]+)/); const asset = m?.[1] || 'BTC-USD'; const px = m ? Number(m[2]) : await getPrice(asset);
       if (task === 'propose') return JSON.stringify({ action: 'open', asset, side: 'long', stop: +(px * 0.99).toFixed(2), take_profit: +(px * 1.02).toFixed(2), risk_pct: 1, thesis: 'Mock: breakout above the range.', links: [] });

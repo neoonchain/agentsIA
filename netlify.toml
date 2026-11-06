@@ -5,7 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  # AGENTSIA_FREE_PROXY = "https://your-free-trial-proxy.example"  # optional: 2 free instructions per user
+  # KAIROS_FREE_PROXY = "https://your-free-trial-proxy.example"  # optional: 2 free instructions per user
 
 [[headers]]
   for = "/*"

@@ -5,9 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentsia-news-'));
-process.env.AGENTSIA_HOME = path.join(tmp, 'home');
-process.env.AGENTSIA_VAULT = path.join(tmp, 'vault');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kairos-news-'));
+process.env.KAIROS_HOME = path.join(tmp, 'home');
+process.env.KAIROS_VAULT = path.join(tmp, 'vault');
 
 const { coinsIn, detectShock, NewsHub } = await import('../src/lib/news.js');
 const { App } = await import('../src/lib/core.js');
@@ -61,7 +61,7 @@ test('hub de-duplicates and filters by asset and age', () => {
 });
 
 function freshApp(name) {
-  process.env.AGENTSIA_VAULT = path.join(tmp, name); process.env.AGENTSIA_HOME = path.join(tmp, name + '-home');
+  process.env.KAIROS_VAULT = path.join(tmp, name); process.env.KAIROS_HOME = path.join(tmp, name + '-home');
   const app = new App();
   app.setConfig(updateConfig({ ...app.config, news: { ...app.config.news, tree: false, rss: false, x: false, watch: ['BTC-USD'] } }, { apiKey: 'k' }));
   return app;
@@ -94,16 +94,17 @@ test('a shock triggers an immediate decision, the guard blocks chasing, allow-st
 });
 
 test('inbound webhook needs its token and feeds the hub', async () => {
-  process.env.AGENTSIA_VAULT = path.join(tmp, 'hook'); process.env.AGENTSIA_HOME = path.join(tmp, 'hook-home');
+  process.env.KAIROS_VAULT = path.join(tmp, 'hook'); process.env.KAIROS_HOME = path.join(tmp, 'hook-home');
   const { server, app } = createServer();
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const port = server.address().port, token = app.config.news.webhookToken;
   const post = (headers, body) => new Promise((ok, ko) => { const rq = http.request({ host: '127.0.0.1', port, path: '/api/news/webhook', method: 'POST', headers: { 'Content-Type': 'application/json', Host: 'abc.trycloudflare.com', ...headers } }, rs => { let d = ''; rs.on('data', c => (d += c)); rs.on('end', () => ok({ status: rs.statusCode, body: d })); }); rq.on('error', ko); rq.end(JSON.stringify(body)); });
   try {
     assert.equal((await post({}, { title: 'x' })).status, 401);
-    assert.equal((await post({ 'X-Agentsia-Token': 'wrong' }, { title: 'x' })).status, 401);
-    const ok = await post({ 'X-Agentsia-Token': token }, [{ title: 'j7: new $PEPE tweet from a big account', source: 'j7tracker' }, { text: 'DOGE listed on a new exchange' }]);
+    assert.equal((await post({ 'X-Kairos-Token': 'wrong' }, { title: 'x' })).status, 401);
+    const ok = await post({ 'X-Kairos-Token': token }, [{ title: 'j7: new $PEPE tweet from a big account', source: 'j7tracker' }, { text: 'DOGE listed on a new exchange' }]);
     assert.equal(ok.status, 200); assert.equal(JSON.parse(ok.body).added, 2);
+    assert.equal((await post({ 'X-Agentsia-Token': token }, { title: 'legacy header from an old forwarder' })).status, 200); // pre-rename forwarders keep working
     const feed = await (await fetch(`http://127.0.0.1:${port}/api/news`)).json();
     assert.ok(feed.items.some(i => i.source === 'j7tracker' && i.coins.includes('PEPE')));
     const settings = await (await fetch(`http://127.0.0.1:${port}/api/settings`)).json();

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'site');
-const freeProxy = process.env.AGENTSIA_FREE_PROXY || '';
+const freeProxy = process.env.KAIROS_FREE_PROXY || '';
 fs.rmSync(out, { recursive: true, force: true });
 const copy = (from, to) => { fs.mkdirSync(path.dirname(path.join(out, to)), { recursive: true }); fs.copyFileSync(path.join(root, from), path.join(out, to)); };
 
@@ -24,7 +24,7 @@ const importMap = { imports: Object.fromEntries(['fs', 'path', 'os', 'crypto', '
 let html = fs.readFileSync(path.join(root, 'src/public/app.html'), 'utf8')
   .replace('href="/app.css"', 'href="./app.css"')
   .replace('<script src="/app.js" type="module"></script>',
-    `<script type="importmap">${JSON.stringify(importMap)}</script>\n<script>window.AGENTSIA_FREE_PROXY = ${JSON.stringify(freeProxy)};</script>\n<script src="./boot.js" type="module"></script>`);
+    `<script type="importmap">${JSON.stringify(importMap)}</script>\n<script>window.KAIROS_FREE_PROXY = ${JSON.stringify(freeProxy)};</script>\n<script src="./boot.js" type="module"></script>`);
 if (html.includes('/app.js')) throw new Error('app.html script tag not found');
 fs.writeFileSync(path.join(out, 'app/index.html'), html);
 console.log(`Built ${out} (free-trial proxy: ${freeProxy || 'none'})`);

@@ -25,9 +25,9 @@ export const ROLES = {
 };
 
 export const FREE_LIMIT = 2;
-// Set this to your deployed proxy before distributing the app (or use AGENTSIA_FREE_PROXY).
+// Set this to your deployed proxy before distributing the app (or use KAIROS_FREE_PROXY).
 export const DEFAULT_FREE_PROXY = '';
-export const freeProxyUrl = c => (process.env.AGENTSIA_FREE_PROXY ?? c.freeProxyUrl ?? DEFAULT_FREE_PROXY).replace(/\/+$/, '');
+export const freeProxyUrl = c => (process.env.KAIROS_FREE_PROXY ?? c.freeProxyUrl ?? DEFAULT_FREE_PROXY).replace(/\/+$/, '');
 
 const DEFAULTS = {
   vaultPath: path.join(os.homedir(), 'TradingVault'),
@@ -45,7 +45,11 @@ const DEFAULTS = {
 };
 
 export function configDir() {
-  return process.env.AGENTSIA_HOME || path.join(os.homedir(), '.agentsia');
+  const env = process.env.KAIROS_HOME || process.env.AGENTSIA_HOME;
+  if (env) return env;
+  const dir = path.join(os.homedir(), '.kairos'), old = path.join(os.homedir(), '.agentsia'); // the app was called agentsIA
+  try { if (!fs.existsSync(dir) && fs.existsSync(old)) fs.renameSync(old, dir); } catch { /* keep going with a fresh config */ }
+  return dir;
 }
 const file = () => path.join(configDir(), 'config.json');
 
@@ -56,7 +60,7 @@ export function loadConfig() {
   c.models = { ...DEFAULTS.models, ...(saved.models || {}) };
   c.roles = { ...DEFAULTS.roles, ...(saved.roles || {}) };
   c.enabledRoles = { ...DEFAULTS.enabledRoles, ...(saved.enabledRoles || {}) };
-  if (process.env.AGENTSIA_VAULT) c.vaultPath = process.env.AGENTSIA_VAULT;
+  if (process.env.KAIROS_VAULT || process.env.AGENTSIA_VAULT) c.vaultPath = process.env.KAIROS_VAULT || process.env.AGENTSIA_VAULT;
   c.news = { ...DEFAULTS.news, ...(saved.news || {}) };
   if (!c.news.webhookToken) c.news.webhookToken = crypto.randomUUID().replace(/-/g, '');
   if (!c.installId) { c.installId = crypto.randomUUID(); try { saveConfig(c); } catch { /* read-only home: id stays per session */ } }
@@ -92,5 +96,5 @@ export function publicConfig(c) {
   rest.news = { ...c.news, webhookToken: undefined };
   const left = c.freeRemaining ?? FREE_LIMIT;
   return { ...rest, hasApiKey: !!apiKey, apiKeyHint: apiKey ? '…' + apiKey.slice(-4) : '', freeLimit: FREE_LIMIT, freeUsed: Math.max(FREE_LIMIT - left, 0),
-    freeAvailable: !!freeProxyUrl(c), hasXBearer: !!xBearer, web: !!globalThis.AGENTSIA_WEB, vaultLabel: globalThis.AGENTSIA_VAULT_LABEL || c.vaultPath, hasKraken: !!kraken, krakenHint: kraken ? '…' + kraken.key.slice(-4) : '', krakenCheckedAt: kraken?.checkedAt || null, catalog: { models: MODELS, roles: ROLES } };
+    freeAvailable: !!freeProxyUrl(c), hasXBearer: !!xBearer, web: !!globalThis.KAIROS_WEB, vaultLabel: globalThis.KAIROS_VAULT_LABEL || c.vaultPath, hasKraken: !!kraken, krakenHint: kraken ? '…' + kraken.key.slice(-4) : '', krakenCheckedAt: kraken?.checkedAt || null, catalog: { models: MODELS, roles: ROLES } };
 }
