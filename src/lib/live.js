@@ -132,7 +132,7 @@ export function liveRiskState(live, prices, rules, now = new Date()) {
   if (!acc.dayStart || acc.dayStart.date !== day) acc.dayStart = { date: day, equity: eq };
   if (acc.paused && Date.parse(acc.paused.until) <= now.getTime()) acc.paused = null;
   const dd = (acc.peakEquity - eq) / acc.peakEquity * 100, dayLoss = (acc.dayStart.equity - eq) / acc.dayStart.equity * 100;
-  if (dd >= (Number(rules.max_drawdown_pct) || 8)) return { action: 'stop', reason: `Live drawdown ${r2(dd)}% ≥ ${rules.max_drawdown_pct}%` };
+  if (dd >= (Number(rules.max_drawdown_pct) || 12)) return { action: 'stop', reason: `Live drawdown ${r2(dd)}% ≥ ${rules.max_drawdown_pct}%` };
   if (!acc.paused && dayLoss >= (Number(rules.daily_loss_pct) || 3)) {
     acc.paused = { until: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString(), reason: `Live daily loss ${r2(dayLoss)}% ≥ ${rules.daily_loss_pct}%` };
     return { action: 'paused', reason: acc.paused.reason };

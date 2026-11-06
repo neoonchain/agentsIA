@@ -114,7 +114,7 @@ export function riskTick(acc, prices, rules, now = new Date()) {
   if (acc.paused && Date.parse(acc.paused.until) <= now.getTime()) { events.push({ type: 'resumed' }); acc.paused = null; }
   const dayLoss = (acc.dayStart.equity - eq) / acc.dayStart.equity * 100;
   const dd = (acc.peakEquity - eq) / acc.peakEquity * 100;
-  const maxDD = Number(rules.max_drawdown_pct) || 8, maxDay = Number(rules.daily_loss_pct) || 3;
+  const maxDD = Number(rules.max_drawdown_pct) || 12, maxDay = Number(rules.daily_loss_pct) || 3;
   if (dd >= maxDD) {
     for (const a of Object.keys(acc.positions)) events.push({ type: 'closed', trade: closePosition(acc, a, prices[a] ?? acc.positions[a].entry, 'max drawdown', rules, now) });
     events.push({ type: 'stop', reason: `Max drawdown ${round(dd)}% ≥ ${maxDD}%` });

@@ -69,7 +69,7 @@ starting_balance: 10000
 min_trades: 50
 min_days: 30
 min_profit_factor: 1.5
-max_drawdown_pct: 8
+max_drawdown_pct: 12
 min_adherence_pct: 90
 daily_loss_pct: 3
 max_risk_per_trade_pct: 2

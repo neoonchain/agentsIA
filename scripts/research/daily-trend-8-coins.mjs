@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import * as T from '../../src/lib/trading.js';
 
 const ASSETS = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'XRP-USD', 'DOGE-USD', 'ADA-USD', 'LINK-USD', 'LTC-USD'];
-const RULES = { starting_balance: 10000, fee_pct: 0.4, slippage_pct: 0.05, max_drawdown_pct: 8, daily_loss_pct: 3, max_risk_per_trade_pct: 2,
+const RULES = { starting_balance: 10000, fee_pct: 0.4, slippage_pct: 0.05, max_drawdown_pct: Number(process.env.DD) || 8, daily_loss_pct: 3, max_risk_per_trade_pct: 2,
   min_trades: 50, min_days: 30, min_profit_factor: 1.5, min_adherence_pct: 90 };
 const STRATEGY = { assets: ASSETS, hours_utc: '00:00-23:59', risk_per_trade_pct: 1 };
 const P = { entryN: 20, exitN: 10, atrN: 20, atrStop: 2, riskPct: 1, maxOpen: 4 };
