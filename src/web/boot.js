@@ -29,7 +29,7 @@ async function choose() {
         <div class="card"><h2>Keep it in this browser</h2><p class="sub" style="margin:8px 0 16px">Works in every browser. Export it as a .zip any time to open it in Obsidian. Clearing site data deletes it.</p>
           <button class="btn" id="useBrowser">Use this browser</button></div>
       </div>
-      <p class="sub" style="margin-top:22px">Real-money trading on Kraken is only in the <a href="/#get">desktop app</a>.</p>`);
+      <p class="sub" style="margin-top:22px">Real-money trading on Kraken is only in the <a href="/tour#get">desktop app</a>.</p>`);
     el.querySelector('#useBrowser').onclick = async () => { await vfs.meta.set('vault', { kind: 'browser' }); resolve({ kind: 'browser' }); };
     if (canPickFolder) el.querySelector('#pickDir').onclick = async () => {
       try {

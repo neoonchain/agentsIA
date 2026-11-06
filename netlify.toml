@@ -12,3 +12,8 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"
+
+[[redirects]]
+  from = "/tour"
+  to = "/tour.html"
+  status = 200

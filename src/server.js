@@ -11,6 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '..');
 const STATIC = {
   '/': [path.join(ROOT, 'index.html'), 'text/html'],
+  '/tour': [path.join(ROOT, 'tour.html'), 'text/html'],
   '/app': [path.join(here, 'public', 'app.html'), 'text/html'],
   '/app.js': [path.join(here, 'public', 'app.js'), 'text/javascript'],
   '/app.css': [path.join(here, 'public', 'app.css'), 'text/css'],
