@@ -200,6 +200,10 @@ test('team decision: opens a paper trade with a note when the reviewer agrees', 
   assert.equal(note.data.status, 'open'); assert.match(note.body, /\[\[2026-11-03 BTC long\]\]/); // links to notes that exist stay links
   assert.equal(V.unlinkMissing(app.vault, 'See [[2026-11-03 BTC long]], [[Invented note|that day]] and ![[missing.png]]'), 'See [[2026-11-03 BTC long]], that day and missing.png');
   assert.match(note.body, /Clean scribe thesis/);
+  const d = (await app.strategyView('Range breakout')).decisions[0];
+  assert.equal(d.outcome, 'opened'); assert.equal(d.asset, 'BTC-USD'); assert.ok(d.thesis);
+  assert.deepEqual(d.steps.map(x => x.role), ['charts', 'lead', 'reviewer', 'scribe']);
+  assert.equal(d.reviewerAgreed, true); assert.ok(d.context.prices['BTC-USD'] > 0);
   // price hits the stop on the next tick → closed, note updated
   setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });
   app.account('Range breakout').lastDecisionAt = new Date().toISOString();

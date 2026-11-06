@@ -9,6 +9,7 @@ import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
 import * as K from './kraken.js';
 import * as L from './live.js';
 import { seedExamples, attachExampleCharts } from './examples.js';
+import { RUN4_DECISIONS } from './examples-decisions.js';
 import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf, relayPoll } from './news.js';
 import { getCandles1m } from './market.js';
 const px = L.fmtPx;
@@ -37,6 +38,11 @@ export class App {
     this.state.accounts ||= {}; this.state.promotions ||= {}; this.state.live ||= {};
     if (process.env.KAIROS_EXAMPLES !== '0' && seedExamples(this.vault, this.state)) this.save(); // empty vault: show the paper-test trades
     if (this.state.examples === 'seeded') this.chartsReady = attachExampleCharts(this.vault).catch(() => 0);
+    // an example decision history (paper test 4) until Range breakout has decisions of its own
+    if (this.state.examples === 'seeded' && !(this.state.decisions ||= {})['Range breakout']?.length && !this.state.decisionsExampleShown) {
+      this.state.decisions['Range breakout'] = RUN4_DECISIONS.slice().reverse().map(d => ({ ...d, example: true, mode: 'solo', reasons: [], steps: [{ role: 'lead', model: 'Claude Opus 5.5 · paper test 4', text: d.thesis }] }));
+      this.state.decisionsExampleShown = true; this.save();
+    }
   }
   save() {
     const tmp = this.stateFile + '.tmp';
@@ -303,6 +309,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
         if (p.action !== 'hold') { acc.proposals.total++; if (verdict.offStrategy) acc.proposals.offStrategy++; }
         acc.lastDecisionAt = new Date().toISOString();
         let result = { action: p.action, proposal: p, verdict, reviewerAgreed, reviewReason, steps, mode: this.config.mode, live: live ? live.mode : null };
+        const ctx = () => ({ prices, trend, shocks: shocks.map(x => `${x.asset} ${x.movePct > 0 ? '+' : ''}${x.movePct}% in ${x.mins || 3} min`), headlines: heads.map(h => h.title.slice(0, 160)), lessons: lessons ? lessons.split('\n').filter(l => l.startsWith('- ')).length : 0 });
         if (p.action === 'hold') this.note(`[[${s.name}]] hold · ${String(p.thesis || '').slice(0, 100)}`);
         else if (!verdict.ok) this.note(`[[${s.name}]] ${p.action} ${p.asset} blocked · ${verdict.reasons.join('; ')}${reviewReason ? ' · reviewer: ' + reviewReason.slice(0, 80) : ''}`);
         else if (p.action === 'close') {
@@ -318,7 +325,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
               : T.openPosition(acc, { asset: p.asset, side: p.side, price, stop: Number(p.stop), takeProfit: p.take_profit ? Number(p.take_profit) : null, riskPct: Number(p.risk_pct), rules, meta });
           } catch (e) {
             result.verdict = { ok: false, reasons: [e.message], offStrategy: false };
-            this.note(`[[${s.name}]] open ${p.asset} failed · ${e.message}`); this.save();
+            this.note(`[[${s.name}]] open ${p.asset} failed · ${e.message}`); this.recordDecision(s, result, ctx()); this.save();
             return result;
           }
           if (this.roleOn('scribe')) {
@@ -331,6 +338,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
           this.note(`[[${s.name}]] opened ${live ? (live.mode === 'real' ? 'REAL Kraken' : 'Kraken-validated') : 'paper'} ${p.side} ${p.asset} @ ${px(pos.entry)} stop ${pos.stop} · ${lead.model}${pos.reviewer ? ' + ' + pos.reviewer : ''}`);
           result.position = pos;
         }
+        this.recordDecision(s, result, ctx());
         this.save();
         return result;
       });
@@ -420,6 +428,17 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       }
     }
     return { shocks: triggered, decisions: out };
+  }
+
+  /** Keep what each decision saw, proposed and why, so the app can show how the AI decided. */
+  recordDecision(s, r, context) {
+    const list = ((this.state.decisions ||= {})[s.name] ||= []).filter(d => !d.example), p = r.proposal || {};
+    list.unshift({ at: new Date().toISOString(), mode: r.mode, live: r.live, action: p.action, asset: p.asset, side: p.side || null, stop: p.stop ?? null, takeProfit: p.take_profit ?? null, riskPct: p.risk_pct ?? null,
+      thesis: String(p.thesis || '').slice(0, 1500), outcome: p.action === 'hold' ? 'hold' : !r.verdict.ok ? 'blocked' : p.action === 'close' ? 'closed' : 'opened',
+      reasons: r.verdict.reasons || [], reviewerAgreed: r.reviewerAgreed ?? null, reviewReason: String(r.reviewReason || '').slice(0, 600),
+      entry: r.position?.entry ?? null, pnl: r.trade?.pnl ?? null, context,
+      steps: (r.steps || []).map(x => ({ role: x.role, model: x.model, text: String(x.text || '').slice(0, 4000) })) });
+    this.state.decisions[s.name] = list.slice(0, 60);
   }
 
   /* ---------- learning loop: every closed trade leaves a lesson the next decisions read ---------- */
@@ -630,6 +649,6 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       live = { ...lv, equity: +T.equity(lv.account, lp).toFixed(2), prices: lp, metrics: T.metrics(lv.account.trades, lv.allocationUsd) };
     }
     return { ...meta, body, equity: +T.equity(acc, prices).toFixed(2), account: acc, prices, evaluation: T.evaluate(acc, this.rules()), promotion: this.state.promotions[name] || null, lessons: this.lessons(name, 10).reverse(),
-      live, exchange: { connected: !!this.config.kraken } };
+      live, exchange: { connected: !!this.config.kraken }, decisions: (this.state.decisions?.[name] || []).slice(0, 30), hasKey: !!this.config.apiKey };
   }
 }

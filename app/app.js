@@ -510,6 +510,39 @@ function chip(s) {
   return s.status === 'running' ? '<span class="chip run">running</span>' : '<span class="chip">stopped</span>';
 }
 
+/* ---------- how the AI decided: every decision, step by step ---------- */
+const openDecisions = new Set();
+function decisionsCard(s, running) {
+  const ds = s.decisions || [], ex = ds.length > 0 && ds.every(d => d.example);
+  const title = d => ({ opened: `Opened ${d.side || ''} ${d.asset}`, hold: 'Hold', blocked: `Blocked · ${d.asset}`, closed: `Closed ${d.asset}`, 'stop moved': `Stop moved · ${d.asset}` })[d.outcome] || d.outcome;
+  const tone = d => ({ opened: 'go', closed: 'go', 'stop moved': 'go', blocked: 'no', hold: 'wait' })[d.outcome] || 'wait';
+  const step = (n, h, body) => `<div class="ds"><span class="ds-n">${n}</span><div><b class="ds-h">${h}</b>${body}</div></div>`;
+  const when = d => new Date(d.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+  const item = d => {
+    const st = r => (d.steps || []).find(x => x.role === r), c = d.context || {}, lead = st('lead'), chart = st('charts'), rev = st('reviewer'), scribe = st('scribe');
+    const seen = [
+      c.prices ? `<div class="ds-chips">${Object.entries(c.prices).map(([a, v]) => `<span class="chip">${withCoin(a)} ${fp(v)}</span>`).join('')}</div>` : '',
+      c.trend && Object.keys(c.trend).length ? `<p class="sub">Daily trend: ${Object.entries(c.trend).map(([a, t]) => `${esc(a.split('-')[0])} ${t.ok ? '<span class="pos">with the trend</span>' : '<span class="neg">against the trend</span>'}`).join(' · ')}</p>` : '',
+      c.shocks?.length ? `<p class="sub">Shocks: ${c.shocks.map(esc).join(' · ')}</p>` : '',
+      c.headlines?.length ? `<ul class="ds-news">${c.headlines.slice(0, 4).map(h => `<li>${esc(h)}</li>`).join('')}</ul>` : '',
+      c.lessons ? `<p class="sub">Read ${c.lessons} lessons from earlier trades.</p>` : ''].join('') || '<p class="sub">Hourly candles of the strategy\'s coins.</p>';
+    const prop = d.outcome === 'hold' ? '<p class="ds-v">Proposed: <b>hold</b>, no order.</p>'
+      : `<p class="ds-v">Proposed: <b>${esc(d.action === 'move_stop' ? 'move the stop' : d.action)} ${esc(d.side || '')} ${esc(d.asset || '')}</b>${d.stop != null ? ` · stop ${fp(d.stop)}` : ''}${d.takeProfit != null ? ` · target ${fp(d.takeProfit)}` : ''}${d.riskPct != null ? ` · risk ${esc(d.riskPct)}%` : ''}</p>`;
+    const steps = [
+      step(1, 'What it looked at', seen),
+      chart ? step(2, `Chart reading · ${esc(chart.model)}`, `<div class="md ds-t">${md(chart.text.slice(0, 900))}</div>`) : '',
+      step(chart ? 3 : 2, `The decision · ${esc(lead ? lead.model : 'lead')}`, `${prop}<div class="md ds-t">${md(d.thesis || '')}</div>`),
+      step(chart ? 4 : 3, 'Second opinion', d.outcome === 'hold' && d.reviewerAgreed == null ? '<p class="sub">Not needed: a hold places no order.</p>' : d.reviewerAgreed == null ? `<p class="sub">${d.mode === 'solo' || d.example ? 'Solo: one model decides alone.' : 'No reviewer on.'}</p>` : `<p class="ds-v">${d.reviewerAgreed ? '<span class="pos">Agreed</span>' : '<span class="neg">Disagreed</span>'}${rev ? ` · ${esc(rev.model)}` : ''}</p>${d.reviewReason ? `<p class="sub">${esc(d.reviewReason)}</p>` : ''}`),
+      step(chart ? 5 : 4, 'Brake', d.outcome === 'blocked' ? `<ul class="ds-no">${d.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : d.outcome === 'hold' ? '<p class="sub">Nothing to check: no order.</p>' : '<p class="sub"><span class="pos">Passed</span>: in the strategy, stop on the right side, risk within your limit, trend and position checks.</p>'),
+      step(chart ? 6 : 5, 'Result', `<p class="ds-v">${d.outcome === 'opened' ? `Opened on paper${d.entry ? ` at ${fp(d.entry)}` : ''}.` : d.outcome === 'closed' ? `Closed${d.pnl != null ? `: ${money(d.pnl)}` : ''}.` : d.outcome === 'stop moved' ? `Stop moved to ${fp(d.stop)}.` : d.outcome === 'blocked' ? 'Nothing sent: Brake said no.' : 'Waited for a better moment.'}</p>${scribe ? `<p class="sub">The scribe wrote the journal note (${esc(scribe.model)}).</p>` : ''}`)].join('');
+    return `<details class="dec ${tone(d)}" data-at="${esc(d.at)}"><summary><span class="dec-t mono">${when(d)}</span><span class="dec-b">${esc(title(d))}</span><span class="dec-w">${esc(String(d.thesis || '').slice(0, 150))}${String(d.thesis || '').length > 150 ? '…' : ''}</span><span class="dec-x">+</span></summary><div class="dec-steps">${steps}</div></details>`;
+  };
+  const guide = ex || !ds.length ? `<div class="dec-guide"><div><b>${ex ? 'These are examples: the 10 decisions of paper test 4.' : 'No decisions yet.'}</b><p class="sub">Start the strategy on paper and every decision it makes appears here, step by step, replacing the examples.</p></div>
+    <div class="row">${s.hasKey ? '' : '<button class="btn" data-go="team">1 · Connect your AI key</button>'}${running ? '' : `<button class="btn dark" data-act="start">${s.hasKey ? '1' : '2'} · Start on paper</button>`}<button class="btn" data-act="run" data-busy="Deciding">Run one decision now</button></div></div>` : '';
+  return `<div class="card decs" style="margin-top:16px"><div class="row" style="justify-content:space-between;align-items:flex-end"><div><h3>How the AI decided</h3><p class="sub">What it looked at, what it proposed, who checked it, and why it acted. Newest first${running ? ' · refreshes every minute' : ''}.</p></div>${ds.length ? `<span class="sub">${ds.length} decision${ds.length === 1 ? '' : 's'}</span>` : ''}</div>
+    ${guide}<div class="dec-list">${ds.map(item).join('')}</div></div>`;
+}
+
 async function renderStrategy(name) {
   const box = $('#sdetail');
   let s; try { s = await api('/strategies/' + encodeURIComponent(name)); } catch (e) { box.innerHTML = `<p class="empty">${esc(e.message)}</p>`; return; }
@@ -529,7 +562,7 @@ async function renderStrategy(name) {
       ${a.paused ? `<p class="sub neg" style="margin-top:4px">Paused: ${esc(a.paused.reason)}</p>` : ''}</div>
       <div class="row">${running ? '<button class="btn" data-act="stop">Stop</button>' : `<button class="btn dark" data-act="start" ${s.draft ? 'disabled title="Draft: set draft: false in the note first"' : ''}>Start on paper</button>`}
         <button class="btn" data-act="run" data-busy="Deciding">Run a decision now</button>${pos.length ? '<button class="btn red" data-act="close-all">Close all & stop</button>' : '<button class="btn sm" data-act="reset">Reset account</button>'}
-        <button class="btn sm" data-note="${esc(s.path)}">Open note</button></div></div>
+        <button class="btn sm" data-note="${esc(s.path)}">Open note</button><button class="btn sm" onclick="document.querySelector('.decs').scrollIntoView({behavior:'smooth'})">How the AI decided ↓</button></div></div>
       <div class="grid g4">
         <div class="stat"><span class="eyebrow">Paper equity</span><div class="n">$${s.equity.toLocaleString('en-US')}</div></div>
         <div class="stat"><span class="eyebrow">Closed trades</span><div class="n">${m.count}</div></div>
@@ -544,10 +577,15 @@ async function renderStrategy(name) {
       <div class="card"><h3>Open positions</h3>${pos.length ? `<table style="margin-top:8px"><tr><th>Asset</th><th>Side</th><th>Entry</th><th>Stop</th><th>TP</th><th>Now</th></tr>${pos.map(x => `<tr class="click" data-note="${esc(x.notePath)}"><td>${withCoin(x.asset)}</td><td>${esc(x.side)}</td><td class="num">${fp(x.entry)}</td><td class="num">${fp(x.stop)}</td><td class="num">${fp(x.takeProfit)}</td><td class="num">${fp(s.prices[x.asset])}</td></tr>`).join('')}</table>` : '<p class="empty">No open positions.</p>'}</div>
     </div>
     ${p?.status === 'approved' || s.live ? liveCard(s) : ''}
+    ${decisionsCard(s, running)}
     <div class="card lessons" style="margin-top:16px"><div class="row" style="justify-content:space-between"><h3>Lessons learned</h3><span class="sub">Written after every close · read before every decision · <a href="#" data-note="${esc('Lessons/' + s.name + '.md')}">open note</a></span></div>
       ${s.lessons?.length ? s.lessons.map(l => `<div class="lesson ${/· -/.test(l.title) ? 'loss' : 'win'}"><b class="mono">${esc(l.title)}</b><ul>${l.lines.filter(x => !x.startsWith('Thesis')).map(x => `<li>${md(x).replace(/<\/?p>/g, '')}</li>`).join('')}</ul></div>`).join('') : '<p class="empty">No closed trades yet. Each one will leave a lesson here.</p>'}</div>
     <div class="card" style="margin-top:16px"><h3>Closed paper trades</h3>${a.trades.length ? `<div class="tblwrap"><table style="margin-top:8px"><tr><th>Closed</th><th>Asset</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>R</th><th>Reason</th><th>Models</th></tr>
       ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${withCoin(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
+  // keep opened decisions open across refreshes; refresh every minute while the strategy runs
+  box.querySelectorAll('details.dec').forEach(d => { if (openDecisions.has(d.dataset.at)) d.open = true; d.ontoggle = () => { d.open ? openDecisions.add(d.dataset.at) : openDecisions.delete(d.dataset.at); }; });
+  clearInterval(window.__decTimer);
+  if (running) window.__decTimer = setInterval(() => { if (current === 'strategies' && selected === name && !document.querySelector('dialog[open]')) renderStrategy(name); }, 60000);
   box.querySelectorAll('[data-act]').forEach(b => (b.onclick = () => busy(b, async () => {
     const act = b.dataset.act;
     if ((act === 'close-all' || act === 'reset') && !confirm(act === 'reset' ? 'Reset this paper account? Its trades and evaluation start from zero.' : 'Close every open paper position at market and stop the strategy?')) return;
