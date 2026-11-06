@@ -3,6 +3,7 @@
 // "example", and can be removed in one click.
 import fs from 'node:fs';
 import * as V from './vault.js';
+import { RUN6 } from './examples-run6.js';
 
 export const EXAMPLE_TAG = 'example';
 
@@ -35,12 +36,34 @@ export const EXAMPLES = [
 
 const isExample = t => (t.tags || []).includes(EXAMPLE_TAG);
 
-/** Seed the examples once, into a journal that has never had any trades. */
+/** Paper test 6's trades as journal entries, with a factual note for each. */
+export function run6Trades() {
+  return RUN6.map(([asset, opened, entry, stop, target, exit, qty, pnl, r, reason, closed]) => {
+    const hours = Math.round((Date.parse(closed + 'Z') - Date.parse(opened + 'Z')) / 3600000), win = pnl > 0;
+    return {
+      date: opened, asset, side: 'long', entry, stop, exit, size: qty, pnl, r, strategy: 'Range breakout',
+      emotion: 'rules-based', tags: `example, paper-test-6, breakout, ${reason.replace(/\s+/g, '-')}`,
+      thesis: `Paper test 6, run by Kairos's rules on the app engine (a year no rule was tuned on). ${asset} closed above a 2-day range on 1.5x volume with the daily trend up; a buy limit waited for the retest of the range top and filled at ${entry}. Stop ${stop} at structure, target ${target} (2.5R).`,
+      psychology: 'No discretion: the rules entered, sized at 1% risk and exited. Brake checked every order.',
+      wentWell: win ? `- ${reason === 'take profit' ? 'Reached the 2.5R target' : 'Closed in profit'} after ${hours}h: ${pnl >= 0 ? '+' : ''}${pnl} USD (${r}R).` : '- The stop did its job: the loss stayed near 1R.',
+      wentWrong: win ? (r < 1 ? '- Gave back most of the move before the exit.' : '') : `- ${reason === 'stop' ? 'The breakout failed and the stop was hit' : `Closed by ${reason}`} after ${hours}h: ${pnl} USD (${r}R). Fees of 0.25-0.4% each side add about 0.2R to every loss.`,
+    };
+  });
+}
+
+/** Seed the examples once, into a journal that has never had any trades; vaults seeded before also get paper test 6. */
 export function seedExamples(root, state) {
-  if (state.examples) return false;
-  state.examples = V.listJournal(root).length ? 'skipped' : 'seeded';
-  if (state.examples === 'seeded') for (const t of EXAMPLES) V.createJournalTrade(root, t);
-  return state.examples === 'seeded';
+  if (!state.examples) {
+    state.examples = V.listJournal(root).length ? 'skipped' : 'seeded';
+    if (state.examples !== 'seeded') return false;
+    for (const t of [...EXAMPLES, ...run6Trades()]) V.createJournalTrade(root, t);
+    state.examplesVersion = 2; return true;
+  }
+  if (state.examples === 'seeded' && (state.examplesVersion || 1) < 2) {
+    for (const t of run6Trades()) V.createJournalTrade(root, t);
+    state.examplesVersion = 2; return true;
+  }
+  return false;
 }
 
 export function removeExamples(root) {

@@ -160,6 +160,23 @@ test('team ask: reviewer disagreement triggers a revision; solo uses one model',
   assert.equal(s.answer, 'Draft answer'); assert.equal(calls.length, 1); assert.equal(calls[0].modelId, '~x-ai/grok-latest');
 });
 
+test('chats are saved in the vault, listed, continued with their history, and deletable', async () => {
+  const app = freshApp('chats'); app.setConfig(updateConfig(app.config, { apiKey: 'k', mode: 'solo', soloModel: 'opus' }));
+  mock();
+  const a = await app.ask('Where do I lose the most money?');
+  assert.match(a.chat, /^Chats\/.+\.md$/);
+  const b = await app.ask('And on which coin?', a.chat);
+  assert.equal(b.chat, a.chat);
+  assert.match(calls.at(-1).user, /Conversation so far[\s\S]*Where do I lose the most money\?[\s\S]*Draft answer/);
+  const list = app.chats();
+  assert.equal(list.length, 1); assert.equal(list[0].messages, 4); assert.match(list[0].title, /Where do I lose the most money/);
+  const c = app.chat(a.chat);
+  assert.deepEqual(c.messages.map(m => m.role), ['user', 'assistant', 'user', 'assistant']);
+  assert.equal(c.messages[2].text, 'And on which coin?');
+  assert.throws(() => app.chat('Trades/x.md'), /Not a chat/);
+  app.deleteChat(a.chat); assert.equal(app.chats().length, 0);
+});
+
 test('analyse writes an insight and a clamped draft strategy that cannot start', async () => {
   const app = freshApp('analyse'); app.setConfig(updateConfig(app.config, { apiKey: 'k' })); mock();
   const r = await app.analyse();

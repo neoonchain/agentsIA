@@ -38,7 +38,7 @@ const DEFAULTS = {
   roles: { lead: 'opus', psychology: 'fable', scribe: 'sonnet', reviewer: 'gpt', charts: 'astra', context: 'gemini', sentiment: 'grok' },
   enabledRoles: { lead: true, psychology: true, scribe: true, reviewer: true, charts: true, context: false, sentiment: false },
   webSearch: false,
-  news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '' },
+  news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '', relay: true, relayTopic: '', alerts: [], notify: { shocks: true, headlines: true, alerts: true } },
   xBearer: '',
   freeRemaining: null,     // last value reported by the free-trial proxy
   installId: '',
@@ -63,6 +63,8 @@ export function loadConfig() {
   if (process.env.KAIROS_VAULT || process.env.AGENTSIA_VAULT) c.vaultPath = process.env.KAIROS_VAULT || process.env.AGENTSIA_VAULT;
   c.news = { ...DEFAULTS.news, ...(saved.news || {}) };
   if (!c.news.webhookToken) c.news.webhookToken = crypto.randomUUID().replace(/-/g, '');
+  if (!c.news.relayTopic) c.news.relayTopic = 'kairos-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24); // private ntfy.sh topic for forwarded alerts
+  c.news.alerts ||= []; c.news.notify ||= { shocks: true, headlines: true, alerts: true };
   if (!c.installId) { c.installId = crypto.randomUUID(); try { saveConfig(c); } catch { /* read-only home: id stays per session */ } }
   return c;
 }

@@ -94,6 +94,15 @@ export const SOURCES = {
   },
 };
 
+/** Forwarded alerts through ntfy.sh (a free relay any forwarder can POST to), so even the browser app can receive them. */
+export const RELAY = 'https://ntfy.sh';
+export async function relayPoll(topic, since = '10m', base = RELAY) {
+  const txt = await getText(`${base}/${encodeURIComponent(topic)}/json?poll=1&since=${encodeURIComponent(since)}`);
+  return txt.split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(m => m && m.event === 'message' && m.message)
+    .map(m => ({ id: 'relay:' + m.id, time: (m.time || Date.now() / 1000) * 1000, title: (m.title ? m.title + ': ' : '') + String(m.message).replace(/\s+/g, ' ').slice(0, 400), url: m.click || '', source: m.tags?.[0] ? `Forwarded · ${m.tags[0]}` : 'Forwarded', tags: [], relayId: m.id }));
+}
+
 export const DEFAULT_RSS = ['https://cointelegraph.com/rss', 'https://www.theblock.co/rss.xml'];
 
 /* ---------------- the hub ---------------- */

@@ -9,7 +9,7 @@ import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
 import * as K from './kraken.js';
 import * as L from './live.js';
 import { seedExamples, attachExampleCharts } from './examples.js';
-import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf } from './news.js';
+import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf, relayPoll } from './news.js';
 import { getCandles1m } from './market.js';
 const px = L.fmtPx;
 
@@ -119,16 +119,51 @@ export class App {
     return out;
   }
 
+  /* ---------- chats: every conversation is a note in Chats/, so it can be reopened and continued ---------- */
+  chats() {
+    return V.listNotes(this.vault, 'Chats').map(p => { const n = V.readNote(this.vault, p); return { path: p, title: String(n.data.title || path.basename(p, '.md')), updated: String(n.data.updated || n.data.created || ''), messages: this.parseChat(n.body).length }; })
+      .sort((a, b) => b.updated.localeCompare(a.updated));
+  }
+  parseChat(body) {
+    const out = [], rx = /^## (You|Kairos)(?: \(([^)]*)\))? · (\S+)\n([\s\S]*?)(?=^## (?:You|Kairos)|(?![\s\S]))/gm;
+    for (const m of body.matchAll(rx)) out.push({ role: m[1] === 'You' ? 'user' : 'assistant', model: m[2] || '', at: m[3], text: m[4].trim() });
+    return out;
+  }
+  chat(rel) {
+    if (!/^Chats\/[^/]+\.md$/.test(String(rel))) throw Object.assign(new Error('Not a chat'), { status: 400 });
+    const n = V.readNote(this.vault, rel);
+    return { path: rel, title: String(n.data.title || ''), messages: this.parseChat(n.body) };
+  }
+  deleteChat(rel) {
+    if (!/^Chats\/[^/]+\.md$/.test(String(rel))) throw Object.assign(new Error('Not a chat'), { status: 400 });
+    fs.unlinkSync(V.resolveInVault(this.vault, rel)); return { deleted: rel };
+  }
+  saveChatTurn(rel, q, answer, model) {
+    const now = new Date().toISOString();
+    let data, body;
+    if (rel) { const n = V.readNote(this.vault, rel); data = n.data; body = n.body.trimEnd() + '\n\n'; }
+    else {
+      const title = q.replace(/\s+/g, ' ').slice(0, 60).replace(/[?.!,;:]+$/, '');
+      rel = V.uniquePath(this.vault, `Chats/${now.slice(0, 10)} ${V.safeName(title).slice(0, 50) || 'Chat'}.md`);
+      data = { title, created: now, mode: this.config.mode, tags: ['chat'] }; body = `# ${title}\n\n`;
+    }
+    body += `## You · ${now}\n${q}\n\n## Kairos (${model}) · ${now}\n${answer}\n`;
+    V.writeNote(this.vault, rel, { ...data, updated: now }, body);
+    return rel;
+  }
+
   /* ---------- ask ---------- */
-  ask(question) {
+  ask(question, chatPath) {
     const q = String(question || '').trim().slice(0, 2000);
     if (!q) throw Object.assign(new Error('Write a question first'), { status: 400 });
+    const prior = chatPath ? this.chat(chatPath).messages.slice(-8) : [];
+    const history = prior.length ? `Conversation so far (most recent last):\n${prior.map(m => `${m.role === 'user' ? 'User' : 'You'}: ${m.text.slice(0, 1500)}`).join('\n\n')}\n\n` : '';
     return this.instruction('ask', async ins => {
       const ctx = this.journalContext();
       const steps = [];
-      const draft = await this.call(ins, 'lead', 'ask', 'You are the lead analyst. Answer the user using their journal.', `${ctx}\n\nQuestion: ${q}`);
+      const draft = await this.call(ins, 'lead', 'ask', 'You are the lead analyst. Answer the user using their journal. Keep the conversation going: refer to earlier messages when the question follows up on them.', `${ctx}\n\n${history}Question: ${q}`);
       steps.push(draft);
-      let answer = draft.text;
+      let answer = draft.text, author = draft.model;
       if (this.roleOn('reviewer')) {
         const rv = await this.call(ins, 'reviewer', 'review', 'You are the second opinion. Check the draft answer against the journal data for errors, unsupported claims or missing risks. Reply ONLY with JSON: {"agree": true|false, "issues": ["..."]}',
           `${ctx}\n\nQuestion: ${q}\n\nDraft answer:\n${draft.text}`, { maxTokens: 600 });
@@ -137,11 +172,12 @@ export class App {
         if (verdict.agree === false && verdict.issues?.length) {
           const rev = await this.call(ins, 'lead', 'revise', 'You are the lead analyst. Revise your answer to address the reviewer\'s issues. Output only the final answer.',
             `${ctx}\n\nQuestion: ${q}\n\nYour draft:\n${draft.text}\n\nReviewer issues:\n- ${verdict.issues.join('\n- ')}`);
-          steps.push(rev); answer = rev.text;
+          steps.push(rev); answer = rev.text; author = rev.model;
         }
       }
       this.note(`ask (${this.config.mode}) · ${q.slice(0, 80)}`);
-      return { answer, mode: this.config.mode, steps };
+      const chat = this.saveChatTurn(chatPath || null, q, answer, author);
+      return { answer, mode: this.config.mode, steps, chat };
     });
   }
 
@@ -346,7 +382,18 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     if (cfg.tree && due('tree', 25000)) { this.newsAt.tree = now; jobs.push(this.news.poll('Tree of Alpha', () => NEWS.tree())); }
     if (cfg.rss && !globalThis.KAIROS_WEB && due('rss', 120000)) { this.newsAt.rss = now; for (const u of DEFAULT_RSS) jobs.push(this.news.poll(new URL(u).hostname, () => NEWS.rss(u))); }
     if (cfg.x && this.config.xBearer && due('x', 60000)) { this.newsAt.x = now; jobs.push(this.news.poll('X API', () => NEWS.x(this.config.xBearer, cfg.xQuery))); }
+    if (cfg.relay && cfg.relayTopic && due('relay', 25000)) { this.newsAt.relay = now; jobs.push(this.news.poll('Forwarded alerts', async () => { const items = await relayPoll(cfg.relayTopic, this.relaySince || '10m', process.env.KAIROS_RELAY || undefined); if (items.length) this.relaySince = items.at(-1).relayId; return items; })); }
     for (const fresh of await Promise.all(jobs)) for (const n of fresh) this.recordNews(n);
+    // price alerts you set in Argus
+    const fired = [];
+    for (const al of (cfg.alerts || []).filter(a => !a.firedAt)) {
+      let px; try { px = await getPrice(al.asset); } catch { continue; }
+      if (al.op === 'above' ? px >= al.price : px <= al.price) {
+        al.firedAt = new Date(now).toISOString(); al.firedPrice = px; fired.push(al);
+        this.note(`ALERT ${al.asset} ${al.op} ${al.price} · now ${px}${al.note ? ' · ' + al.note : ''}`);
+      }
+    }
+    if (fired.length) { this.firedAlerts = [...fired.map(a => ({ ...a, t: now })), ...(this.firedAlerts || [])].slice(0, 30); this.setConfig({ ...this.config, news: { ...cfg, alerts: [...cfg.alerts] } }); }
     // shocks on every watched asset
     const rules = this.rules(), triggered = [];
     for (const asset of this.watchedAssets()) {

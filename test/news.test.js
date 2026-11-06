@@ -64,7 +64,7 @@ test('hub de-duplicates and filters by asset and age', () => {
 function freshApp(name) {
   process.env.KAIROS_VAULT = path.join(tmp, name); process.env.KAIROS_HOME = path.join(tmp, name + '-home');
   const app = new App();
-  app.setConfig(updateConfig({ ...app.config, news: { ...app.config.news, tree: false, rss: false, x: false, watch: ['BTC-USD'] } }, { apiKey: 'k' }));
+  app.setConfig(updateConfig({ ...app.config, news: { ...app.config.news, tree: false, rss: false, x: false, relay: false, watch: ['BTC-USD'] } }, { apiKey: 'k' }));
   return app;
 }
 const prompts = [];
@@ -120,14 +120,15 @@ test('an empty vault gets the paper-test examples once; removing them is permane
   try {
     const app = new App();
     const j = V.listJournal(app.vault);
-    assert.equal(j.length, 3); assert.ok(j.every(t => t.tags.includes('example')));
-    assert.deepEqual(j.map(t => t.asset).sort(), ['BTC-USD', 'ETH-USD', 'SOL-USD']);
-    assert.equal(await app.chartsReady, 3); // each example gets its chart in Attachments/
-    const withCharts = V.listJournal(app.vault);
+    assert.equal(j.length, 40); assert.ok(j.every(t => t.tags.includes('example'))); // 3 annotated + 37 from paper test 6
+    assert.equal(j.filter(t => t.tags.includes('paper-test-6')).length, 37);
+    assert.equal(await app.chartsReady, 3); // the 3 annotated examples get their chart in Attachments/
+    const withCharts = V.listJournal(app.vault).filter(t => t.image);
+    assert.equal(withCharts.length, 3);
     assert.ok(withCharts.every(t => /^Attachments\/.+\.webp$/.test(t.image)), JSON.stringify(withCharts.map(t => t.image)));
     assert.ok(V.readImage(app.vault, withCharts[0].image));
     const { removeExamples } = await import('../src/lib/examples.js');
-    assert.equal(removeExamples(app.vault), 3); app.state.examples = 'removed'; app.save();
+    assert.equal(removeExamples(app.vault), 40); app.state.examples = 'removed'; app.save();
     assert.equal(V.listJournal(new App().vault).length, 0); // reopening does not seed again
   } finally { process.env.KAIROS_EXAMPLES = '0'; }
 });
@@ -153,4 +154,25 @@ test('Memecoin momentum v2: never buys into a crash, one position, unedited v1 i
   V.initVault(dir);
   const m = V.readNote(dir, 'Strategies/Memecoin momentum.md');
   assert.equal(m.data.version, 2); assert.equal(m.data.status, 'running');
+});
+
+test('Argus alerts: price alerts fire once, forwarded alerts arrive through the relay', async () => {
+  const relay = http.createServer((req, res) => {
+    assert.match(req.url, /^\/kairos-[a-f0-9]+\/json\?poll=1&since=/);
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.end(['{"id":"a1","time":1790000000,"event":"open"}', '{"id":"m1","time":1790000000,"event":"message","title":"j7tracker","message":"$PEPE big account just tweeted","tags":["j7"]}', ''].join('\n'));
+  });
+  await new Promise(r => relay.listen(0, '127.0.0.1', r));
+  process.env.KAIROS_RELAY = `http://127.0.0.1:${relay.address().port}`;
+  try {
+    const app = freshApp('alerts');
+    app.setConfig({ ...app.config, news: { ...app.config.news, relay: true, alerts: [{ id: 'x1', asset: 'BTC-USD', op: 'above', price: 80000 }, { id: 'x2', asset: 'BTC-USD', op: 'below', price: 70000 }] } });
+    setMockMarket({ prices: { 'BTC-USD': 81000 }, candles: [] });
+    await app.newsTick();
+    assert.ok(app.news.items.some(i => i.source === 'Forwarded · j7' && i.coins.includes('PEPE')), 'relay item ingested');
+    assert.equal(app.firedAlerts.length, 1); assert.equal(app.firedAlerts[0].id, 'x1');
+    assert.ok(app.config.news.alerts.find(a => a.id === 'x1').firedAt); assert.ok(!app.config.news.alerts.find(a => a.id === 'x2').firedAt);
+    app.newsAt = {}; await app.newsTick();
+    assert.equal(app.firedAlerts.length, 1); // fires once, until re-armed
+  } finally { delete process.env.KAIROS_RELAY; relay.close(); }
 });

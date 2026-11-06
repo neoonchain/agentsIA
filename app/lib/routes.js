@@ -18,9 +18,17 @@ export function createApi(app) {
         const acc = app.account(s.name), ev = T.evaluate(acc, rules);
         const lv = app.liveOf(s.name);
         return { name: s.name, status: s.status, draft: !!s.draft, live: lv ? lv.mode : null, assets: s.assets, trades: acc.trades.length, open: Object.keys(acc.positions).length,
-          pnl: ev.metrics.totalPnl, eligible: ev.eligible, paused: acc.paused, promotion: app.state.promotions[s.name]?.status || null };
+          pnl: ev.metrics.totalPnl, eligible: ev.eligible, paused: acc.paused, promotion: app.state.promotions[s.name]?.status || null,
+          checks: ev.checks.map(c => ({ label: c.label, value: c.value, pass: c.pass })), lesson: app.lessons(s.name, 1)[0] || null };
       });
-      return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length, examples: journal.filter(t => t.tags.includes('example')).length, recent: journal.slice(-4).reverse(),
+      const byAsset = {}, exits = {};
+      for (const t of journal) {
+        const a = byAsset[t.asset] ||= { asset: t.asset, n: 0, wins: 0, pnl: 0 }; a.n++; a.pnl += t.pnl; if (t.pnl > 0) a.wins++;
+        const why = (t.tags.find(x => /^(take-profit|stop|time-stop|protected-stop|max-drawdown|end-of-test)$/.test(x)) || (t.pnl > 0 ? 'win' : 'loss')).replace(/-/g, ' ');
+        exits[why] = (exits[why] || 0) + 1;
+      }
+      const headlines = app.news.relevant(app.watchedAssets(), 24 * 3600000, 5).map(h => ({ title: h.title, source: h.source, time: h.time, url: h.url, coins: h.coins }));
+      return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length, examples: journal.filter(t => t.tags.includes('example')).length, recent: journal.slice(-5).reverse(), byAsset: Object.values(byAsset).sort((a, b) => b.n - a.n).map(a => ({ ...a, pnl: Math.round(a.pnl * 100) / 100 })), exits, headlines,
         strategies, activity: app.activity.slice(0, 30), config: publicConfig(app.config) };
     }],
     ['GET', /^\/api\/settings$/, async () => publicConfig(app.config)],
@@ -30,7 +38,7 @@ export function createApi(app) {
     ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
     ['GET', /^\/api\/news$/, async () => ({ items: app.news.items.slice(0, 120), shocks: app.news.shocks.slice(0, 30), status: app.news.status, watch: app.watchedAssets(),
-      guards: Object.fromEntries(Object.entries(app.shockUntil).filter(([, g]) => g.until > Date.now())) })],
+      guards: Object.fromEntries(Object.entries(app.shockUntil).filter(([, g]) => g.until > Date.now())), alerts: app.firedAlerts || [], notify: app.config.news.notify })],
     ['GET', /^\/api\/news\/settings$/, async () => ({ ...app.config.news, hasXBearer: !!app.config.xBearer })],
     ['PUT', /^\/api\/news\/settings$/, async (_, b) => {
       const n = { ...app.config.news };
@@ -38,6 +46,16 @@ export function createApi(app) {
       if (typeof b.xQuery === 'string' && b.xQuery.trim()) n.xQuery = b.xQuery.trim().slice(0, 512);
       if (Array.isArray(b.watch)) n.watch = [...new Set(b.watch.map(a => String(a).trim().toUpperCase()).filter(a => /^[A-Z0-9]{2,10}-[A-Z]{3,4}$/.test(a)))].slice(0, 20);
       if (b.rotateToken) n.webhookToken = crypto.randomUUID().replace(/-/g, '');
+      if (b.rotateRelay) n.relayTopic = 'kairos-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
+      if (typeof b.relay === 'boolean') n.relay = b.relay;
+      if (b.notify && typeof b.notify === 'object') n.notify = { shocks: !!b.notify.shocks, headlines: !!b.notify.headlines, alerts: !!b.notify.alerts };
+      if (b.addAlert) {
+        const a = b.addAlert, asset = String(a.asset || '').trim().toUpperCase(), price = Number(a.price);
+        if (!/^[A-Z0-9]{2,10}-[A-Z]{3,4}$/.test(asset) || !(price > 0) || !['above', 'below'].includes(a.op)) throw err(400, 'An alert needs a coin like BTC-USD, above or below, and a price');
+        n.alerts = [...(n.alerts || []), { id: crypto.randomUUID().slice(0, 8), asset, op: a.op, price, note: String(a.note || '').slice(0, 120), createdAt: new Date().toISOString() }].slice(-30);
+      }
+      if (b.removeAlert) n.alerts = (n.alerts || []).filter(a => a.id !== b.removeAlert);
+      if (b.rearmAlert) n.alerts = (n.alerts || []).map(a => a.id === b.rearmAlert ? { ...a, firedAt: undefined, firedPrice: undefined } : a);
       const c = { ...app.config, news: n };
       if (typeof b.xBearer === 'string') c.xBearer = b.xBearer.trim();
       app.setConfig(c);
@@ -82,7 +100,10 @@ export function createApi(app) {
     }],
     ['PUT', /^\/api\/exchange$/, async (_, b) => { await app.setKraken(b); return publicConfig(app.config); }],
     ['DELETE', /^\/api\/exchange$/, async () => { app.removeKraken(); return publicConfig(app.config); }],
-    ['POST', /^\/api\/ask$/, async (_, b) => app.ask(b.question)],
+    ['POST', /^\/api\/ask$/, async (_, b) => app.ask(b.question, b.chat || null)],
+    ['GET', /^\/api\/chats$/, async () => app.chats()],
+    ['GET', /^\/api\/chat$/, async q => app.chat(q.get('path'))],
+    ['DELETE', /^\/api\/chat$/, async q => app.deleteChat(q.get('path'))],
     ['POST', /^\/api\/analyse$/, async () => app.analyse()],
     ['GET', /^\/api\/price$/, async q => ({ asset: q.get('asset'), price: await getPrice(q.get('asset')) })],
   ];

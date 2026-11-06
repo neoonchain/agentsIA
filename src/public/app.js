@@ -137,6 +137,28 @@ const views = {
         <div class="card"><div class="head" style="margin-bottom:8px"><h2>Latest trades</h2><button class="btn sm" data-go="journal">Journal</button></div>
           ${s.recent.length ? `<div class="lt">${s.recent.map(t => `<div class="lt-row click" data-note="${esc(t.path)}"><span class="lt-a">${withCoin(t.asset)} <span class="sub">${esc(t.side)} · ${esc(String(t.date).slice(0, 10))}</span></span><span class="num ${cls(t.pnl)}">${money(t.pnl)}${t.r != null ? ` · ${t.r > 0 ? '+' : ''}${t.r}R` : ''}</span></div>`).join('')}</div>` : '<p class="empty">No trades yet. Log your first one in the Journal.</p>'}</div>
       </div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card"><div class="head" style="margin-bottom:6px"><h2>Road to real money</h2><button class="btn sm" data-go="rules">Marks</button></div>
+          <p class="sub" style="margin-bottom:14px">A strategy only asks for real money when every mark is beaten on paper. No shortcuts.</p>
+          ${s.strategies.map(x => { const n = (x.checks || []).filter(c => c.pass).length, tot = (x.checks || []).length || 6; return `<div class="road click" data-strat="${esc(x.name)}">
+            <div class="road-h"><b>${esc(x.name)}</b><span class="mono">${n}/${tot} marks</span></div>
+            <div class="road-bar"><i style="width:${Math.round(n / tot * 100)}%"></i></div>
+            <div class="road-c">${(x.checks || []).map(c => `<span class="${c.pass ? 'ok' : ''}">${c.pass ? '✓' : '·'} ${esc(c.label.replace(/ [≥≤>].*/, ''))}</span>`).join('')}</div>
+            ${x.lesson ? `<p class="sub road-l">Latest lesson: ${esc(x.lesson.lines[0] || x.lesson.title)}</p>` : ''}</div>`; }).join('')}
+        </div>
+        <div class="card"><div class="head" style="margin-bottom:8px"><h2>Argus · latest</h2><button class="btn sm" data-go="news">Argus</button></div>
+          ${s.headlines.length ? `<div class="heads">${s.headlines.map(h => `<a ${h.url ? `href="${esc(h.url)}" target="_blank" rel="noopener noreferrer"` : ''}><span class="mono sub">${ago(new Date(h.time).toISOString())}</span><span>${esc(h.title.slice(0, 140))}</span><span class="hc">${h.coins.slice(0, 2).map(c => coin(c)).join('')}</span></a>`).join('')}</div>` : '<p class="empty">Argus is warming up. Headlines about your coins land here within a minute.</p>'}
+        </div>
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card"><h2 style="margin-bottom:12px">By coin</h2>
+          ${s.byAsset.length ? `<table><tr><th>Coin</th><th>Trades</th><th>Win rate</th><th>PnL</th></tr>${s.byAsset.map(a => `<tr><td>${withCoin(a.asset)}</td><td class="num">${a.n}</td><td class="num">${a.n >= 10 ? Math.round(a.wins / a.n * 100) + '%' : `${a.wins}W · ${a.n - a.wins}L`}</td><td class="num ${cls(a.pnl)}">${money(a.pnl)}</td></tr>`).join('')}</table>` : '<p class="empty">Log a trade to see this.</p>'}
+        </div>
+        <div class="card"><h2 style="margin-bottom:12px">How trades ended</h2>
+          ${Object.keys(s.exits).length ? (() => { const tot = Object.values(s.exits).reduce((x, y) => x + y, 0); return `<div class="bars">${Object.entries(s.exits).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<div><span>${esc(k)}</span><i><b class="${/take|win/.test(k) ? 'g' : /^stop|loss|drawdown/.test(k) ? 'r' : ''}" style="width:${Math.round(v / tot * 100)}%"></b></i><span class="mono">${v}</span></div>`).join('')}</div>`; })() : '<p class="empty">Nothing closed yet.</p>'}
+          <p class="sub" style="margin-top:14px">A healthy strategy loses small and often, and wins big sometimes. Lots of stops is normal; stops bigger than 1R are not.</p>
+        </div>
+      </div>
       ${s.activity.length ? `<div class="card" style="margin-top:16px">        <h2 style="margin-bottom:8px">Activity</h2><div class="feed">${s.activity.length ? s.activity.map(a => `<div><time>${ago(a.at)}</time><span>${md(a.msg).replace(/<\/?p>/g, '')}</span></div>`).join('') : '<p class="empty">Nothing yet this session. Full history is in the vault\'s Log folder.</p>'}</div></div>` : ''}`;
   },
 
@@ -237,20 +259,54 @@ const views = {
   },
 
   async ask() {
-    const team = settings.mode === 'team';
+    const team = settings.mode === 'team', M = settings.catalog.models;
+    const who = team ? `Lead: ${M[settings.roles.lead].label}${settings.enabledRoles.reviewer ? ` · checked by ${M[settings.roles.reviewer].label}` : ''}` : `Solo: ${M[settings.soloModel].label}`;
+    const chats = await api('/chats');
+    const st = views.ask ||= {};
+    if (st.chat && !chats.some(c => c.path === st.chat)) st.chat = null;
+    const cur = st.chat ? await api('/chat?path=' + encodeURIComponent(st.chat)) : { title: '', messages: [] };
+    const SUGGEST = ['Where do I lose the most money?', 'What do my losing trades have in common?', 'Which coin should I stop trading?', 'Write anti-tilt rules from my journal', 'Am I moving my stops?', 'What is my best setup?'];
+    const msg = m => m.role === 'user' ? `<div class="msg you"><div class="bub">${esc(m.text)}</div></div>`
+      : `<div class="msg ai"><span class="eyebrow who">${esc(m.model || 'Kairos')}</span><div class="md">${md(m.text)}</div>${m.steps ? `<div class="steps">${m.steps.map(x => `<details><summary>${esc(x.role)} · ${esc(x.model)}</summary><pre>${esc(x.text)}</pre></details>`).join('')}</div>` : ''}</div>`;
     view.innerHTML = `
-      <div class="head"><div><h1>Ask the ${team ? 'team' : 'model'}</h1><p>${team ? `The lead (${esc(settings.catalog.models[settings.roles.lead].label)}) answers from your journal and ${settings.enabledRoles.reviewer ? `${esc(settings.catalog.models[settings.roles.reviewer].label)} checks it; if it disagrees, the answer is revised.` : 'no reviewer is enabled.'}` : `${esc(settings.catalog.models[settings.soloModel].label)} answers on its own.`} Switch Team / Solo at the top.</p></div></div>
-      <div class="card soft"><textarea id="q" placeholder="Where do I lose the most money? What should my rules be after two losses?" style="min-height:96px"></textarea>
-        <div class="row" style="margin-top:12px"><button class="btn dark" id="askBtn" data-busy="Thinking">Ask</button><button class="btn" id="anBtn" data-busy="Analysing">Analyse my whole journal</button>
-        <span class="sub">Analyse writes an insight note and a draft strategy into your vault.</span></div></div>
-      <div id="out"></div>`;
-    const show = r => {
-      $('#out').innerHTML = `<div class="answer"><span class="eyebrow">${r.mode === 'team' ? 'Team answer' : 'Solo answer'}</span><div class="md" style="margin-top:8px">${md(r.answer || '')}</div>
-        ${r.insight ? `<div class="row" style="margin-top:14px"><button class="btn sm" data-note="${esc(r.insight)}">Open insight note</button>${r.strategy ? `<button class="btn sm" data-note="${esc(r.strategy)}">Open draft strategy</button>` : ''}</div>` : ''}
-        <div class="steps">${r.steps.map(s => `<details><summary>${esc(s.role)} · ${esc(s.model)}</summary><pre>${esc(s.text)}</pre></details>`).join('')}</div></div>`;
+      <div class="chat-wrap">
+        <aside class="chat-side">
+          <button class="btn dark new-chat" id="newChat">+ New chat</button>
+          <span class="eyebrow side-l">Your chats</span>
+          <div class="chat-list">${chats.length ? chats.map(c => `<div class="ci ${c.path === st.chat ? 'on' : ''}" data-chat="${esc(c.path)}"><b>${esc(c.title)}</b><span class="eyebrow">${c.updated ? agoText(c.updated) : ''} · ${c.messages / 2 | 0} ${c.messages / 2 === 1 ? 'question' : 'questions'}</span><button class="x" data-del="${esc(c.path)}" aria-label="Delete chat">×</button></div>`).join('') : '<p class="sub empty-s">Your conversations are saved here, and in <span class="mono">Chats/</span> in your vault.</p>'}</div>
+        </aside>
+        <section class="chat-main">
+          <div class="chat-head"><div><span class="eyebrow">${esc(who)}</span><h1>${cur.messages.length ? esc(cur.title) : 'Ask Kairos'}</h1></div>
+            <button class="btn" id="anBtn" data-busy="Analysing">Analyse my whole journal</button></div>
+          <div class="thread" id="thread">${cur.messages.length ? cur.messages.map(msg).join('') : `
+            <div class="hello"><h2>What do you want to know<br>about your trading?</h2><p class="sub">Answers come from your journal. ${team ? 'A second model checks every answer before you see it.' : 'Switch to Team at the top for a second opinion on every answer.'}</p>
+            <div class="sugg">${SUGGEST.map(q => `<button class="chipbtn" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div></div>`}</div>
+          <div class="composer"><textarea id="q" rows="1" placeholder="${cur.messages.length ? 'Ask a follow-up…' : 'Ask anything about your trades…'}"></textarea><button class="btn dark send" id="askBtn" data-busy="Thinking">Ask ↗</button></div>
+          <p class="sub hint-s">Enter to send · Shift + Enter for a new line · Analyse writes an insight note and a draft strategy into your vault.</p>
+        </section>
+      </div>`;
+    const q = $('#q'), thread = $('#thread');
+    const grow = () => { q.style.height = 'auto'; q.style.height = Math.min(220, q.scrollHeight) + 'px'; }; q.oninput = grow;
+    thread.scrollTop = thread.scrollHeight;
+    const send = async text => {
+      text = (text ?? q.value).trim(); if (!text) return toast('Write a question first', true);
+      if (!cur.messages.length) thread.innerHTML = '';
+      thread.insertAdjacentHTML('beforeend', msg({ role: 'user', text }) + '<div class="msg ai pending"><span class="eyebrow who">Thinking</span><div class="dots"><i></i><i></i><i></i></div></div>');
+      q.value = ''; grow(); thread.scrollTop = thread.scrollHeight;
+      await busy($('#askBtn'), async () => {
+        try { const r = await api('/ask', { method: 'POST', body: { question: text, chat: st.chat } }); st.chat = r.chat; await refreshSettings(); render(); }
+        catch (e) { thread.querySelector('.pending')?.remove(); throw e; }
+      });
     };
-    $('#askBtn').onclick = e => busy(e.currentTarget, async () => { const q = $('#q').value.trim(); if (!q) return toast('Write a question first', true); show(await api('/ask', { method: 'POST', body: { question: q } })); await refreshSettings(); });
-    $('#anBtn').onclick = e => busy(e.currentTarget, async () => { const r = await api('/analyse', { method: 'POST' }); r.answer = `Analysis saved to **${r.insight}**.${r.strategy ? ` A draft strategy was written to **${r.strategy}**: review it, set \`draft: false\`, then start it on paper.` : ''}${r.review ? `\n\nSecond opinion: ${r.review.agree ? 'agrees' : 'disagrees'}.${(r.review.issues || []).map(i => '\n- ' + i).join('')}` : ''}`; show(r); await refreshSettings(); });
+    $('#askBtn').onclick = () => send();
+    q.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+    view.querySelectorAll('[data-q]').forEach(b => (b.onclick = () => send(b.dataset.q)));
+    $('#newChat').onclick = () => { st.chat = null; render(); };
+    view.querySelectorAll('[data-chat]').forEach(el => (el.onclick = e => { if (e.target.closest('[data-del]')) return; st.chat = el.dataset.chat; render(); }));
+    view.querySelectorAll('[data-del]').forEach(b => (b.onclick = async () => { if (!confirm('Delete this chat? The note in Chats/ is removed too.')) return; await api('/chat?path=' + encodeURIComponent(b.dataset.del), { method: 'DELETE' }); if (st.chat === b.dataset.del) st.chat = null; render(); }));
+    $('#anBtn').onclick = e => busy(e.currentTarget, async () => { const r = await api('/analyse', { method: 'POST' });
+      thread.insertAdjacentHTML('beforeend', `<div class="msg ai"><span class="eyebrow who">Journal analysis</span><div class="md">${md(`Saved to **${r.insight}**.${r.strategy ? ` A draft strategy is in **${r.strategy}**: review it before starting it on paper.` : ''}`)}</div><div class="row" style="margin-top:10px"><button class="btn sm" data-note="${esc(r.insight)}">Open insight note</button>${r.strategy ? `<button class="btn sm" data-note="${esc(r.strategy)}">Open draft strategy</button>` : ''}</div></div>`);
+      thread.scrollTop = thread.scrollHeight; await refreshSettings(); });
   },
 
   async strategies() {
@@ -290,45 +346,106 @@ const views = {
       <div class="row jfilter" style="margin-top:18px" id="nfilter"><button class="chipbtn ${onlyWatched ? 'on' : ''}" data-o="1">Watched coins</button><button class="chipbtn ${onlyWatched ? '' : 'on'}" data-o="0">Everything</button><span class="sub">${items.length} items</span></div>
       <div class="feedlist">${items.slice(0, 80).map(i => `<a class="nitem" ${i.url ? `href="${esc(i.url)}" target="_blank" rel="noopener noreferrer"` : ''}><span class="t mono">${agoS(i.time)}</span><span class="s">${esc(i.source)}</span><span class="h">${esc(i.title)}</span><span class="c">${i.coins.map(c => `<span class="chip ${watch.has(c) ? 'ok' : ''}">${withCoin(c)}</span>`).join('')}</span></a>`).join('') || '<p class="empty">Nothing about the watched coins yet.</p>'}</div>
       <div class="grid g2" style="margin-top:22px">
-        <div class="card"><h3>Settings</h3>
-          <label class="check" style="margin-top:10px"><input type="checkbox" id="nTree" ${ns.tree ? 'checked' : ''}> Tree of Alpha: tweets and headlines, seconds old, free</label>
-          <label class="check"><input type="checkbox" id="nRss" ${ns.rss ? 'checked' : ''} ${web ? 'disabled' : ''}> RSS: Cointelegraph, The Block ${web ? '(desktop app only)' : ''}</label>
-          <label class="check"><input type="checkbox" id="nX" ${ns.x ? 'checked' : ''}> X API (your key, every 60 s)</label>
-          <label style="margin-top:10px">X bearer token ${ns.hasXBearer ? '(saved)' : ''}<input id="nXKey" type="password" placeholder="${ns.hasXBearer ? '•••••••• saved' : 'AAAA…'}" autocomplete="off"></label>
-          <label>X search query<input id="nXQ" value="${esc(ns.xQuery)}" class="mono"></label>
-          <label>Watch these coins (besides running strategies)<input id="nWatch" value="${esc(ns.watch.join(', '))}" class="mono"></label>
-          <div class="row" style="margin-top:12px"><button class="btn dark" id="nSave">Save</button></div></div>
-        <div class="card"><h3>Forward any alert here</h3>
-          ${web ? '<p class="sub" style="margin-top:8px">The web version has no server to receive alerts. Use the desktop app for the incoming URL.</p>' : `
-          <p class="sub" style="margin:8px 0 12px">Anything that can call a URL can feed the agents: a j7tracker → Telegram/Discord forwarder, TradingView alerts, n8n, Zapier. To receive from the internet, expose this computer with a tunnel (for example <span class="mono">cloudflared tunnel --url http://localhost:4317</span>) and use that address.</p>
-          <label>URL<input readonly value="${esc(hookUrl)}" class="mono"></label>
-          <label>Token (header X-Kairos-Token)<input readonly value="${esc(ns.webhookToken)}" class="mono"></label>
-          <pre class="curl">curl -X POST ${esc(hookUrl)} \\
-  -H "Content-Type: application/json" \\
-  -H "X-Kairos-Token: ${esc(ns.webhookToken)}" \\
+        <div class="card"><h3>Price alerts</h3><p class="sub" style="margin:6px 0 14px">Checked every 30 seconds. Each alert fires once, writes a line in the Log and notifies you; re-arm it to use it again.</p>
+          <form class="al-form" id="alForm"><input name="asset" list="alCoins" placeholder="BTC-USD" class="mono" required><datalist id="alCoins">${d.watch.map(a => `<option value="${esc(a)}">`).join('')}</datalist>
+            <select name="op"><option value="above">goes above</option><option value="below">goes below</option></select><input name="price" type="number" step="any" min="0" placeholder="Price" required><button class="btn dark">Add</button>
+            <input name="note" placeholder="Note (optional), e.g. breakout of the weekly range" class="al-note"></form>
+          <div class="al-list">${(ns.alerts || []).length ? ns.alerts.slice().reverse().map(a => `<div class="al ${a.firedAt ? 'fired' : ''}"><span>${withCoin(a.asset)}</span><span class="mono">${a.op === 'above' ? '≥' : '≤'} ${esc(a.price)}</span><span class="sub">${a.firedAt ? `fired ${agoText(a.firedAt)} at ${esc(a.firedPrice)}` : 'armed'}${a.note ? ' · ' + esc(a.note) : ''}</span><span class="al-b">${a.firedAt ? `<button class="btn sm" data-rearm="${esc(a.id)}">Re-arm</button>` : ''}<button class="x" data-rm="${esc(a.id)}" aria-label="Remove alert">×</button></span></div>`).join('') : '<p class="empty">No alerts yet. Add one above: a level you care about, and Argus watches it for you.</p>'}</div>
+          <h3 style="margin-top:22px">Notify me about</h3>
+          <div class="toggles">
+            <label class="tg"><input type="checkbox" data-n="shocks" ${ns.notify?.shocks !== false ? 'checked' : ''}><span></span><b>Shocks</b><em>Fast moves on heavy volume</em></label>
+            <label class="tg"><input type="checkbox" data-n="headlines" ${ns.notify?.headlines !== false ? 'checked' : ''}><span></span><b>Headlines</b><em>News about the coins you watch</em></label>
+            <label class="tg"><input type="checkbox" data-n="alerts" ${ns.notify?.alerts !== false ? 'checked' : ''}><span></span><b>Price alerts</b><em>When one of your levels is hit</em></label>
+          </div>
+          <p class="sub" style="margin-top:10px">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Browser notifications are on.' : 'Turn on browser notifications at the top of this page to get them outside the tab.'}</p>
+        </div>
+        <div class="card"><h3>Forward alerts from anywhere</h3>
+          <p class="sub" style="margin:6px 0 14px">j7tracker through a Telegram or Discord bot, TradingView, n8n, Zapier or a script: anything that can send a web request can feed the agents. Kairos reads your private address every 30 seconds, ${web ? 'right here in the browser.' : 'with no tunnel needed.'}</p>
+          <label class="tg"><input type="checkbox" id="nRelay" ${ns.relay !== false ? 'checked' : ''}><span></span><b>Receive forwarded alerts</b><em>Through ntfy.sh, a free public relay</em></label>
+          <label style="margin-top:12px">Your private address<div class="copyrow"><input readonly value="https://ntfy.sh/${esc(ns.relayTopic)}" class="mono" id="relayUrl"><button class="btn sm" data-copy="#relayUrl">Copy</button></div></label>
+          <pre class="curl">curl -d "$PEPE: big account just tweeted" \
+  -H "Title: j7tracker" -H "Tags: j7" \
+  https://ntfy.sh/${esc(ns.relayTopic)}</pre>
+          <p class="sub">In TradingView: alert → Notifications → Webhook URL = your address, message = the alert text. Keep the address private: anyone with it can send alerts (they inform the agents; Brake still checks every order). Free relay limit: about 250 messages a day per network.</p>
+          <div class="row" style="margin-top:12px"><button class="btn sm" id="nTest">Show a test alert</button><button class="btn sm" id="nRotateRelay">New address</button></div>
+          ${web ? '' : `<details style="margin-top:16px"><summary class="sub" style="cursor:pointer">Desktop only: local webhook with a token</summary>
+            <label style="margin-top:10px">URL<input readonly value="${esc(hookUrl)}" class="mono"></label>
+            <label>Token (header X-Kairos-Token)<input readonly value="${esc(ns.webhookToken)}" class="mono"></label>
+            <pre class="curl">curl -X POST ${esc(hookUrl)} \
+  -H "Content-Type: application/json" \
+  -H "X-Kairos-Token: ${esc(ns.webhookToken)}" \
   -d '{"title":"$PEPE: big account just tweeted","source":"j7tracker"}'</pre>
-          <div class="row"><button class="btn sm" id="nTest">Send a test alert</button><button class="btn sm" id="nRotate">New token</button></div>`}</div>
+            <div class="row"><button class="btn sm" id="nRotate">New token</button></div></details>`}
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px"><h3>Sources and watchlist</h3>
+        <div class="src-grid">
+          <div class="toggles">
+            <label class="tg"><input type="checkbox" id="nTree" ${ns.tree ? 'checked' : ''}><span></span><b>Tree of Alpha</b><em>Tweets and headlines, seconds old, free</em></label>
+            <label class="tg"><input type="checkbox" id="nRss" ${ns.rss ? 'checked' : ''} ${web ? 'disabled' : ''}><span></span><b>RSS</b><em>Cointelegraph, The Block${web ? ' · desktop app only' : ''}</em></label>
+            <label class="tg"><input type="checkbox" id="nX" ${ns.x ? 'checked' : ''}><span></span><b>X API</b><em>Your own key, every 60 seconds</em></label>
+          </div>
+          <div class="form1">
+            <label>Watch these coins (besides running strategies)<input id="nWatch" value="${esc(ns.watch.join(', '))}" class="mono"></label>
+            <label>X bearer token ${ns.hasXBearer ? '(saved)' : ''}<input id="nXKey" type="password" placeholder="${ns.hasXBearer ? '•••••••• saved' : 'AAAA…'}" autocomplete="off"></label>
+            <label>X search query<input id="nXQ" value="${esc(ns.xQuery)}" class="mono"></label>
+            <div class="row"><button class="btn dark" id="nSave">Save</button></div>
+          </div>
+        </div>
       </div>`;
     $('#nfilter').onclick = e => { const b = e.target.closest('[data-o]'); if (b) { views.news.only = b.dataset.o === '1'; render(); } };
     $('#notify').onclick = async () => { if (typeof Notification === 'undefined') return toast('This browser has no notifications', true); toast((await Notification.requestPermission()) === 'granted' ? 'Notifications on' : 'Notifications blocked', false); render(); };
+    const put = async (body, msg) => { await api('/news/settings', { method: 'PUT', body }); if (msg) toast(msg); render(); };
     $('#nSave').onclick = () => busy($('#nSave'), async () => {
       const body = { tree: $('#nTree').checked, rss: $('#nRss').checked, x: $('#nX').checked, xQuery: $('#nXQ').value, watch: $('#nWatch').value.split(',') };
       if ($('#nXKey').value.trim()) body.xBearer = $('#nXKey').value.trim();
-      await api('/news/settings', { method: 'PUT', body }); toast('News settings saved'); render();
+      await put(body, 'Sources saved');
     });
-    if ($('#nTest')) $('#nTest').onclick = async () => { await api('/news/test', { method: 'POST' }); toast('Test alert added'); render(); };
-    if ($('#nRotate')) $('#nRotate').onclick = async () => { if (!confirm('Make a new token? Forwarders using the old one stop working.')) return; await api('/news/settings', { method: 'PUT', body: { rotateToken: true } }); render(); };
+    $('#alForm').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); put({ addAlert: { asset: f.asset, op: f.op, price: Number(f.price), note: f.note } }, `Alert set: ${f.asset.toUpperCase()} ${f.op} ${f.price}`).catch(fail); };
+    view.querySelectorAll('[data-rm]').forEach(b => (b.onclick = () => put({ removeAlert: b.dataset.rm }, 'Alert removed')));
+    view.querySelectorAll('[data-rearm]').forEach(b => (b.onclick = () => put({ rearmAlert: b.dataset.rearm }, 'Alert re-armed')));
+    view.querySelectorAll('[data-n]').forEach(c => (c.onchange = () => put({ notify: Object.fromEntries([...view.querySelectorAll('[data-n]')].map(x => [x.dataset.n, x.checked])) }, 'Notifications updated')));
+    $('#nRelay').onchange = e => put({ relay: e.target.checked }, e.target.checked ? 'Receiving forwarded alerts' : 'Forwarded alerts off');
+    view.querySelectorAll('[data-copy]').forEach(b => (b.onclick = async () => { const v = $(b.dataset.copy).value; try { await navigator.clipboard.writeText(v); } catch { $(b.dataset.copy).select(); document.execCommand('copy'); } toast('Copied'); }));
+    $('#nTest').onclick = async () => { await api('/news/test', { method: 'POST' }); toast('Test alert added to the feed'); render(); };
+    $('#nRotateRelay').onclick = async () => { if (!confirm('Make a new address? Forwarders using the old one stop reaching Kairos.')) return; await put({ rotateRelay: true }, 'New address ready'); };
+    if ($('#nRotate')) $('#nRotate').onclick = async () => { if (!confirm('Make a new token? Forwarders using the old one stop working.')) return; await put({ rotateToken: true }); };
   },
 
   async rules() {
-    const r = await api('/rules');
-    const label = { starting_balance: 'Paper starting balance (USD)', min_trades: 'Mark · minimum paper trades', min_days: 'Mark · minimum days on paper', min_profit_factor: 'Mark · minimum profit factor',
-      max_drawdown_pct: 'Mark & limit · max drawdown %', min_adherence_pct: 'Mark · follows strategy %', daily_loss_pct: 'Limit · daily loss %', max_risk_per_trade_pct: 'Limit · max risk per trade %',
-      fee_pct: 'Paper fee % per side', slippage_pct: 'Paper slippage %', first_tier_usd: 'First real-money tier (USD)', min_24h_volume_usd: 'Real money · min 24h volume (USD)', max_spread_pct: 'Real money · max spread %' };
-    view.innerHTML = `<div class="head"><div><h1>Marks and limits</h1><p>Stored in <span class="mono">rules.md</span> in your vault. Models read it but can never change it. Brake enforces the limits in code.</p></div></div>
-      <form class="card soft form" id="rf">${Object.entries(r).map(([k, v]) => `<label>${esc(label[k] || k)}<input name="${esc(k)}" type="number" step="any" min="0" value="${esc(v)}"></label>`).join('')}
-      <div class="w4"><button class="btn dark">Save rules</button></div></form>`;
-    $('#rf').onsubmit = async e => { e.preventDefault(); try { await api('/rules', { method: 'PUT', body: Object.fromEntries(new FormData(e.target)) }); toast('Rules saved'); } catch (er) { fail(er); } };
+    const [r, st] = await Promise.all([api('/rules'), api('/status')]);
+    const G = [
+      ['Marks to unlock real money', 'A paper strategy may only ask for real money when it beats every one of these. You approve it; nothing goes live on its own.', [
+        ['min_trades', 'Paper trades', 'trades', 'Enough trades to tell skill from luck. Fewer than 50 says very little.'],
+        ['min_days', 'Days on paper', 'days', 'Live time on paper, so it has seen more than one kind of market.'],
+        ['min_profit_factor', 'Profit factor', '×', 'Money won divided by money lost. 1.5 means $1.50 back for every $1 lost.'],
+        ['max_drawdown_pct', 'Max drawdown', '%', 'The deepest fall from a peak. Also a hard limit: Brake stops the strategy if it is crossed.'],
+        ['min_adherence_pct', 'Follows its strategy', '%', 'Share of proposals that respect the strategy note. Off-strategy ideas count against it.']]],
+      ['Limits Brake enforces', 'Plain code, not a model: these are checked on every order and every minute.', [
+        ['daily_loss_pct', 'Daily loss', '%', 'Lose this much in a day and the strategy pauses until tomorrow.'],
+        ['max_risk_per_trade_pct', 'Max risk per trade', '%', 'The most of the account one stop can cost. Strategies can ask for less, never more.'],
+        ['shock_guard_min', 'Shock guard', 'min', 'After a sudden move, no new entries on that coin for this long. Nobody chases the candle.']]],
+      ['Paper simulation', 'How realistic paper trading is. Kraken-level costs keep the results honest.', [
+        ['starting_balance', 'Starting balance', 'USD', 'The paper account each strategy starts with.'],
+        ['fee_pct', 'Fee per side', '%', 'Charged on entry and on exit. Kraken charges 0.25-0.40% at the lowest tier.'],
+        ['slippage_pct', 'Slippage', '%', 'How much worse than the quote each market order fills.']]],
+      ['Real money', 'Only in the desktop app, only after your approval, and only on Kraken spot with keys that cannot withdraw.', [
+        ['first_tier_usd', 'First tier', 'USD', 'How much a newly approved strategy gets to start with.'],
+        ['min_24h_volume_usd', 'Minimum 24h volume', 'USD', 'Coins that trade less than this are refused: thin markets eat stops.'],
+        ['max_spread_pct', 'Maximum spread', '%', 'If the gap between buy and sell prices is wider, the order is refused.']]],
+      ['Argus · shock detection', 'How big a fast move must be before Argus calls it a shock.', [
+        ['shock_major_pct', 'Shock threshold · majors', '%', 'BTC, ETH, SOL and similar.'],
+        ['shock_meme_pct', 'Shock threshold · memecoins', '%', 'Memecoins move more, so the bar is higher.']]],
+    ];
+    const known = new Set(G.flatMap(g => g[2].map(x => x[0]))), other = Object.keys(r).filter(k => !known.has(k));
+    if (other.length) G.push(['Other', 'Keys found in your rules.md.', other.map(k => [k, k, '', ''])]);
+    const stand = k => st.strategies.map(x => { const c = (x.checks || []).find(c => c.label.toLowerCase().includes({ min_trades: 'paper trades', min_days: 'days on paper', min_profit_factor: 'profit factor', max_drawdown_pct: 'max drawdown', min_adherence_pct: 'follows strategy' }[k] || '~')); return c ? `<span class="${c.pass ? 'ok' : ''}" title="${esc(x.name)}">${esc(x.name.split(' ')[0])}: ${esc(c.value)}</span>` : ''; }).join('');
+    view.innerHTML = `<div class="head"><div><h1>Marks and limits</h1><p>Stored in <span class="mono">rules.md</span> in your vault. The models read it but can never change it, and Brake enforces the limits in code.</p></div><button class="btn sm" data-note="rules.md">Open rules.md</button></div>
+      <form id="rf">${G.map(([title, desc, rows]) => `<section class="card rg"><div class="rg-h"><h2>${esc(title)}</h2><p class="sub">${esc(desc)}</p></div>
+        ${rows.filter(([k]) => k in r).map(([k, name, unit, help]) => `<div class="rr"><div><b>${esc(name)}</b><p class="sub">${esc(help)}</p>${title.startsWith('Marks') ? `<div class="stand">${stand(k)}</div>` : ''}</div>
+          <label class="ri"><input name="${esc(k)}" type="number" step="any" min="0" value="${esc(r[k])}"><span>${esc(unit)}</span></label></div>`).join('')}</section>`).join('')}
+        <div class="rf-bar"><span class="sub">Changes apply to every strategy from the next check.</span><button class="btn dark">Save rules</button></div></form>`;
+    $('#rf').onsubmit = async e => { e.preventDefault(); try { await api('/rules', { method: 'PUT', body: Object.fromEntries(new FormData(e.target)) }); toast('Rules saved'); render(); } catch (er) { fail(er); } };
   },
 
   async team() {
@@ -395,7 +512,15 @@ async function renderStrategy(name) {
   const pos = Object.values(a.positions);
   box.innerHTML = `
     <div class="card"><div class="head" style="margin-bottom:12px"><div><h2>${esc(s.name)} ${chip({ ...s, paused: a.paused, promotion: p?.status })}</h2>
-      <p class="sub" style="margin-top:6px">${s.assets.map(withCoin).join(' ')} · hours ${esc(s.hours_utc || 'any')} UTC · risk ${esc(s.risk_per_trade_pct)}% · decides every ${esc(s.interval_min || 60)} min${Number(s.max_positions) > 0 ? ` · max ${esc(s.max_positions)} open` : ''}${s.trend_filter === true ? ' · trend filter on' : ''}${a.lastDecisionAt ? ` · last decision ${agoText(a.lastDecisionAt)}` : ''}</p>
+      <div class="s-coins">${s.assets.map(a => `<span class="chip">${withCoin(a)}</span>`).join('')}</div>
+      <div class="s-meta">
+        <div><span class="eyebrow">Hours (UTC)</span><b>${esc(s.hours_utc || 'any')}</b></div>
+        <div><span class="eyebrow">Risk per trade</span><b>${esc(s.risk_per_trade_pct)}%</b></div>
+        <div><span class="eyebrow">Decides every</span><b>${esc(s.interval_min || 60)} min</b></div>
+        <div><span class="eyebrow">Max open</span><b>${Number(s.max_positions) > 0 ? esc(s.max_positions) : 'no limit'}</b></div>
+        <div><span class="eyebrow">Trend filter</span><b>${s.trend_filter === true ? 'On' : 'Off'}</b></div>
+        <div><span class="eyebrow">Last decision</span><b>${a.lastDecisionAt ? agoText(a.lastDecisionAt) : 'never'}</b></div>
+      </div>
       ${a.paused ? `<p class="sub neg" style="margin-top:4px">Paused: ${esc(a.paused.reason)}</p>` : ''}</div>
       <div class="row">${running ? '<button class="btn" data-act="stop">Stop</button>' : `<button class="btn dark" data-act="start" ${s.draft ? 'disabled title="Draft: set draft: false in the note first"' : ''}>Start on paper</button>`}
         <button class="btn" data-act="run" data-busy="Deciding">Run a decision now</button>${pos.length ? '<button class="btn red" data-act="close-all">Close all & stop</button>' : '<button class="btn sm" data-act="reset">Reset account</button>'}
@@ -480,10 +605,13 @@ let newsSeen = null;
 async function watchNews() {
   try {
     const d = await api('/news'), watch = new Set(d.watch.map(a => a.split('-')[0]));
-    const latest = Math.max(0, ...d.shocks.map(s => s.t), ...d.items.filter(i => i.coins.some(c => watch.has(c))).map(i => i.seenAt || 0));
+    const nf = d.notify || {}, alerts = d.alerts || [];
+    const latest = Math.max(0, ...d.shocks.map(s => s.t), ...alerts.map(a => a.t), ...d.items.filter(i => i.coins.some(c => watch.has(c))).map(i => i.seenAt || 0));
     if (newsSeen === null) { newsSeen = latest; return; }
-    const fresh = [...d.shocks.filter(s => s.t > newsSeen).map(s => `Shock ${s.asset} ${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min`),
-      ...d.items.filter(i => (i.seenAt || 0) > newsSeen && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => i.title.slice(0, 120))];
+    const fresh = [
+      ...(nf.alerts !== false ? alerts.filter(a => a.t > newsSeen).map(a => `Alert: ${a.asset} ${a.op} ${a.price} (now ${a.firedPrice})${a.note ? ' · ' + a.note : ''}`) : []),
+      ...(nf.shocks !== false ? d.shocks.filter(s => s.t > newsSeen).map(s => `Shock ${s.asset} ${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min`) : []),
+      ...(nf.headlines !== false ? d.items.filter(i => (i.seenAt || 0) > newsSeen && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => i.title.slice(0, 120)) : [])];
     newsSeen = Math.max(newsSeen, latest);
     for (const msg of fresh) {
       toast(msg);
