@@ -6,6 +6,9 @@
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+<link rel="manifest" href="../manifest.webmanifest" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Kairos" />
 <title>Kairos | Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,5 +33,6 @@
 <script type="importmap">{"imports":{"node:fs":"./shims/fs.js","node:path":"./shims/path.js","node:os":"./shims/os.js","node:crypto":"./shims/crypto.js","node:url":"./shims/url.js"}}</script>
 <script>window.KAIROS_FREE_PROXY = "";</script>
 <script src="./boot.js" type="module"></script>
+<script>if ('serviceWorker' in navigator && !navigator.userAgent.includes('Electron')) navigator.serviceWorker.register(new URL('../sw.js', location.href), { scope: new URL('../', location.href).pathname }).catch(() => {});</script>
 </body>
 </html>

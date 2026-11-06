@@ -40,6 +40,8 @@
         "filter": [
           "index.html",
           "tour.html",
+          "manifest.webmanifest",
+          "sw.js",
           "assets/**/*"
         ]
       }

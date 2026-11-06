@@ -6,17 +6,18 @@
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<title>Kairos | Trade the right moment</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Kairos">
+<title>Kairos | Stop being the exit liquidity</title>
 <meta name="description" content="A trading journal you own, AI agents that learn from it on paper, and real money only after they beat the marks you set." />
 <meta name="theme-color" content="#ffffff" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <style>
 :root{
   --bg:#fff; --soft:#f2f4f7; --ink:#010521; --ink-2:#101638; --mute:#40455f; --mute-2:#6b7088; --line:#e5e7ec;
-  --blue:#0055ff; --sky:#97e6ff; --sky-2:#6fd8fb; --sky-soft:#e8f8ff; --lime:#def105;
+  --blue:#0055ff; --sky:#97e6ff; --sky-2:#6fd8fb; --sky-soft:#e8f8ff; --lime:#def105; --red:#ef4423; --ok:#2f9e6a;
   --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Menlo,monospace;
   --g:clamp(18px,3.4vw,48px); --ease:cubic-bezier(.2,.7,.1,1); --io:cubic-bezier(.76,0,.24,1);
 }
@@ -26,15 +27,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!important}
-.mono{font-family:var(--mono)}
 .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.24em;text-transform:uppercase}
 html.menu-open{overflow:hidden}
-
-/* film grain over everything (very light) */
-.grain{position:fixed;inset:-50%;z-index:90;pointer-events:none;opacity:.07;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:grain 1.2s steps(6) infinite}
+.grain{position:fixed;inset:-50%;z-index:90;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:grain 1.2s steps(6) infinite}
 @keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-4%,3%)}40%{transform:translate(3%,-5%)}60%{transform:translate(-2%,4%)}80%{transform:translate(5%,1%)}100%{transform:translate(0,0)}}
 
-/* ---------- loader ---------- */
+/* loader */
 #loader{position:fixed;inset:0;z-index:200;background:var(--ink);color:#fff;display:none;clip-path:inset(0 0 0 0);transition:clip-path 1.1s var(--io)}
 html.loading #loader{display:block}
 #loader.out{clip-path:inset(0 0 100% 0)}
@@ -44,10 +42,12 @@ html.loading #loader{display:block}
 #loader .tag{position:absolute;right:var(--g);bottom:var(--g);text-align:right;line-height:2;color:#8d93ad}
 #loader .tag b{font-weight:400;color:var(--sky)}
 
-/* ---------- header ---------- */
+/* header + menu */
 .top{position:fixed;top:0;left:0;right:0;z-index:120;display:flex;align-items:center;justify-content:space-between;padding:20px var(--g);pointer-events:none;transition:transform .6s var(--ease)}
 .top>*{pointer-events:auto}
 .top.hide{transform:translateY(-110%)}
+.top.solid{background:rgba(255,255,255,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding-top:12px;padding-bottom:12px}
+.menu-open .top.solid{background:transparent;backdrop-filter:none}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:22px;letter-spacing:-.03em;transition:color .4s}
 .brand svg{width:28px;height:28px}
 .top-r{display:flex;gap:10px;align-items:center}
@@ -60,8 +60,6 @@ html.loading #loader{display:block}
 .mbtn i{display:block;width:16px;height:1.5px;background:var(--ink);transition:transform .5s var(--ease)}
 .mbtn i+i{margin-top:5px}
 .menu-open .mbtn i:first-child{transform:translateY(3.25px) rotate(45deg)}.menu-open .mbtn i:last-child{transform:translateY(-3.25px) rotate(-45deg)}
-
-/* ---------- full-screen menu ---------- */
 #menu{position:fixed;inset:0;z-index:110;background:var(--ink);color:#fff;clip-path:circle(0% at calc(100% - 70px) 43px);transition:clip-path .9s var(--io);display:flex;flex-direction:column;justify-content:flex-end;padding:120px var(--g) var(--g)}
 .menu-open #menu{clip-path:circle(150% at calc(100% - 70px) 43px)}
 #menu nav a{display:block;overflow:hidden;font-size:clamp(44px,8.4vw,128px);font-weight:500;letter-spacing:-.055em;line-height:1.02}
@@ -72,55 +70,72 @@ html.loading #loader{display:block}
 #menu .foot{display:flex;justify-content:space-between;gap:20px;margin-top:44px;color:#8d93ad;flex-wrap:wrap}
 .menu-open .brand{color:#fff}
 
-/* ---------- hero ---------- */
-.hero{position:relative;height:100svh;min-height:640px;overflow:hidden;background:radial-gradient(120% 90% at 70% 35%,#0a1a4a 0%,#030820 45%,#01030f 100%);color:#fff}
-.hero::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(to top,rgba(1,3,15,.92) 0%,rgba(1,3,15,0) 42%),radial-gradient(60% 50% at 70% 40%,rgba(0,85,255,.22),rgba(0,85,255,0) 70%)}
-.hero .glow{position:absolute;width:46vw;height:46vw;right:6vw;top:6vh;border-radius:50%;background:radial-gradient(circle,rgba(111,216,251,.35),rgba(0,85,255,.12) 45%,transparent 70%);filter:blur(30px);z-index:0;pointer-events:none}
-.hero canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-#pix{opacity:.8;mix-blend-mode:screen}
-#gl{z-index:1}
-.hero .copy{position:absolute;left:var(--g);right:var(--g);bottom:clamp(76px,10vh,110px);z-index:2;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:30px;pointer-events:none}
-.h1{font-size:clamp(58px,10.6vw,176px);font-weight:500;letter-spacing:-.06em;line-height:.88}
+/* ---------- intro: the pixel wave that assembles into the Kairos mark ---------- */
+.intro{position:relative;height:330vh}
+.pin{position:sticky;top:0;height:100svh;min-height:600px;overflow:hidden;background:#fff}
+#px{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pin .meta{position:absolute;top:96px;left:var(--g);right:var(--g);display:flex;justify-content:space-between;color:var(--mute-2);pointer-events:none}
+.hero-copy{position:absolute;left:var(--g);right:var(--g);bottom:clamp(76px,10vh,110px);display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:30px;will-change:transform,opacity}
+.h1{font-size:clamp(56px,10.4vw,172px);font-weight:500;letter-spacing:-.06em;line-height:.88}
 .h1 .ln{display:block;overflow:hidden;padding-bottom:.07em}
 .h1 .ln>span{display:block;transform:translateY(110%);transition:transform 1.4s var(--ease)}
 .h1 .ln:nth-child(2)>span{transition-delay:.08s}
-.h1 em{font-style:normal;background:linear-gradient(92deg,#bdf0ff 0%,#6fd8fb 35%,#2f6bff 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.h1 em{font-style:normal;color:var(--blue)}
 .ready .h1 .ln>span{transform:none}
-.hero .side{max-width:330px;display:grid;gap:18px;justify-items:start;pointer-events:auto}
-.hero .side .acts{display:flex;gap:10px;flex-wrap:wrap}
-.pill.ghost-d{color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.25)}.pill.ghost-d:hover{background:#fff;color:var(--ink)}
-.hero .side p{font-size:16px;line-height:1.5;color:#aab3d4}
+.side{max-width:340px;display:grid;gap:18px;justify-items:start}
+.side p{font-size:16px;line-height:1.5;color:var(--mute)}
+.side .acts{display:flex;gap:10px;flex-wrap:wrap}
 .fade{opacity:0;transform:translateY(18px);transition:opacity 1s var(--ease) .5s,transform 1s var(--ease) .5s}
 .ready .fade{opacity:1;transform:none}
-.hero .meta{position:absolute;top:104px;left:var(--g);right:var(--g);z-index:2;display:flex;justify-content:space-between;color:#7d86ad;pointer-events:none}
-.hero .scroll{display:flex;align-items:center;gap:12px;color:#7d86ad}
-.hero .scroll i{width:30px;height:30px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.2);display:grid;place-items:center;font-style:normal;animation:bob 2s var(--io) infinite}
-@keyframes bob{50%{transform:translateY(4px)}}
-
-/* live ticker along the bottom of the hero */
-.tick{position:absolute;left:0;right:0;bottom:0;z-index:2;height:52px;border-top:1px solid rgba(151,230,255,.14);display:flex;align-items:center;overflow:hidden;background:rgba(1,3,15,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.tick .live{position:relative;z-index:1;display:flex;align-items:center;gap:10px;padding:0 var(--g);height:100%;border-right:1px solid rgba(151,230,255,.14);color:var(--sky);flex:none;background:#020616}
-.tick .live i{width:7px;height:7px;border-radius:50%;background:#22c58b;box-shadow:0 0 0 0 rgba(34,197,139,.6);animation:ping 1.8s infinite}
-@keyframes ping{70%{box-shadow:0 0 0 9px rgba(34,197,139,0)}100%{box-shadow:0 0 0 0 rgba(34,197,139,0)}}
-.tick .tr{display:flex;gap:46px;padding-left:30px;white-space:nowrap;animation:tk 38s linear infinite;color:#c9d0ec}
+.formed{position:absolute;left:0;right:0;bottom:clamp(80px,12vh,130px);text-align:center;opacity:0;transform:translateY(24px);pointer-events:none;will-change:transform,opacity}
+.formed h2{font-size:clamp(34px,4.6vw,72px);font-weight:500;letter-spacing:-.05em;line-height:1}
+.formed p{margin-top:14px;color:var(--mute-2)}
+.hint{position:absolute;left:50%;bottom:76px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--mute-2);pointer-events:none}
+.hint i{width:1px;height:34px;background:linear-gradient(var(--ink),transparent);animation:drip 2s var(--io) infinite;transform-origin:top}
+@keyframes drip{0%{transform:scaleY(0)}50%{transform:scaleY(1)}100%{transform:scaleY(0);transform-origin:bottom}}
+.tick{position:absolute;left:0;right:0;bottom:0;height:52px;border-top:1px solid var(--line);display:flex;align-items:center;overflow:hidden;background:rgba(255,255,255,.75);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.tick .live{position:relative;z-index:1;display:flex;align-items:center;gap:10px;padding:0 var(--g);height:100%;border-right:1px solid var(--line);color:var(--blue);flex:none;background:#fff}
+.tick .live i{width:7px;height:7px;border-radius:50%;background:#22c58b;animation:ping 1.8s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(34,197,139,.6)}70%{box-shadow:0 0 0 9px rgba(34,197,139,0)}100%{box-shadow:0 0 0 0 rgba(34,197,139,0)}}
+.tick .tr{display:flex;gap:46px;padding-left:30px;white-space:nowrap;animation:tk 40s linear infinite;color:var(--ink-2)}
 .tick .tr span{display:inline-flex;align-items:center;gap:9px}.tick .tr img{width:16px;height:16px;border-radius:50%}
-.tick .up{color:#22c58b}.tick .dn{color:#ff6a52}.tick .tr em{font-style:normal;color:#6f789e}
+.tick .up{color:#1f9d6c}.tick .dn{color:var(--red)}.tick .tr em{font-style:normal;color:var(--mute-2)}
 @keyframes tk{to{transform:translateX(-50%)}}
-.top.on-dark .brand{color:#fff}.top.on-dark .mbtn{background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.18)}.top.on-dark .mbtn i{background:#fff}.top.on-dark .mbtn:hover{background:var(--sky)}.top.on-dark .mbtn:hover i{background:var(--ink)}
-/* cursor */
-.cur{position:fixed;left:0;top:0;z-index:300;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;border:1.5px solid #fff;pointer-events:none;transition:width .35s var(--ease),height .35s var(--ease),margin .35s var(--ease),background .35s,border-color .35s;mix-blend-mode:difference;display:none}
-.cur.big{opacity:0}
-.cur.dot{width:10px;height:10px;margin:-5px 0 0 -5px;background:#fff}
-@media (pointer:fine){.cur{display:block}}
 
-/* ---------- statement ---------- */
-.about{padding:clamp(110px,18vh,220px) var(--g) clamp(80px,12vh,140px);display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:40px}
-.about .k{color:var(--mute-2);padding-top:14px}
-.about p{font-size:clamp(30px,4.2vw,68px);font-weight:400;letter-spacing:-.045em;line-height:1.06;max-width:22ch}
-.about p .w{color:#d6d9e1;transition:color .45s}
-.about p .w.on{color:var(--ink)}
-.about p .w.on.b{color:var(--blue)}
-.about .pill{margin-top:44px}
+/* ---------- the point ---------- */
+.point{padding:clamp(110px,18vh,220px) var(--g) clamp(70px,10vh,120px);display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:40px}
+.point .k{color:var(--mute-2);padding-top:16px}
+.point h2{font-size:clamp(46px,7.4vw,124px);font-weight:500;letter-spacing:-.06em;line-height:.92}
+.point h2 em{font-style:normal;color:var(--blue)}
+.point p.big-p{margin-top:40px;font-size:clamp(26px,3.2vw,50px);letter-spacing:-.04em;line-height:1.1;max-width:24ch}
+.point p.big-p .w{color:#d3d7e0;transition:color .4s}
+.point p.big-p .w.on{color:var(--ink)}
+.point p.big-p .w.on.r{color:var(--red)}
+.point .pill{margin-top:40px}
+
+/* ---------- two sides ---------- */
+.sides{padding:0 var(--g) clamp(100px,14vh,160px)}
+.sides-h{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:26px}
+.sides-h h2{font-size:clamp(30px,3.6vw,54px);font-weight:500;letter-spacing:-.045em;line-height:1}
+.split{display:grid;grid-template-columns:var(--l,1fr) var(--r,1fr);gap:14px;min-height:min(78vh,700px);transition:grid-template-columns .9s var(--ease)}
+.split[data-open="you"]{--l:2.2fr;--r:1fr}.split[data-open="k"]{--l:1fr;--r:2.2fr}
+.side-c{position:relative;border-radius:26px;padding:clamp(22px,3vw,40px);text-align:left;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;cursor:pointer;min-width:0}
+.side-c.you{background:#14070a;color:#ffd9d1}.side-c.k{background:var(--ink);color:#fff}
+.side-c .lbl{opacity:.7}
+.side-c h3{font-size:clamp(34px,4.4vw,72px);font-weight:500;letter-spacing:-.05em;line-height:.95;margin:18px 0}
+.side-c ul{list-style:none;display:grid;gap:10px;max-width:520px}
+.side-c li{display:flex;gap:12px;align-items:baseline;font-size:clamp(15px,1.2vw,18px);line-height:1.45;opacity:.85}
+.side-c li b{font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.14em;padding:4px 8px;border-radius:999px;flex:none}
+.side-c.you li b{background:rgba(239,68,35,.2);color:#ff8a75}
+.side-c.k li b{background:rgba(151,230,255,.16);color:var(--sky)}
+.side-c .num{font-size:clamp(56px,7vw,120px);font-weight:300;letter-spacing:-.06em;line-height:1}
+.side-c.you .num{color:var(--red)}.side-c.k .num{color:var(--sky)}
+.side-c .more{max-height:0;opacity:0;overflow:hidden;transition:max-height .9s var(--ease),opacity .6s}
+.split[data-open="you"] .you .more,.split[data-open="k"] .k .more{max-height:420px;opacity:1}
+.side-c .peek{opacity:.6;line-height:1.8;transition:opacity .4s}
+.split[data-open] .side-c .peek{opacity:0}
+.side-c .tap{position:absolute;top:clamp(22px,3vw,40px);right:clamp(22px,3vw,40px)}
+.side-c::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 50% at 80% 0%,rgba(255,255,255,.08),transparent 70%)}
 
 /* ---------- featured ---------- */
 .feat{padding:0 var(--g) clamp(100px,14vh,170px)}
@@ -149,6 +164,30 @@ html.loading #loader{display:block}
 .mq .row span.o{color:transparent;-webkit-text-stroke:1.5px var(--ink)}
 .mq .row span b{color:var(--blue);font-weight:500}
 
+/* ---------- keep Kairos in your Dock ---------- */
+.dock-s{margin:clamp(70px,10vh,120px) var(--g) 0;border-radius:32px;background:#000;color:#fff;padding:clamp(70px,12vh,130px) var(--g) clamp(56px,9vh,96px);text-align:center;position:relative;overflow:hidden}
+.dock-s::before{content:"";position:absolute;left:50%;bottom:-30%;width:70%;height:70%;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(151,230,255,.16),transparent);pointer-events:none}
+.dock-s .lbl{color:#8d93ad}
+.dock-s h2{font-size:clamp(40px,5.4vw,84px);font-weight:500;letter-spacing:-.05em;line-height:1;margin:18px 0 26px}
+.dock-s .rule{width:72px;height:1px;margin:0 auto 26px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent)}
+.dock-s p{max-width:560px;margin:0 auto;color:#c4c8d6;font-size:17px;line-height:1.65}
+.dock-btn{display:inline-flex;align-items:center;gap:12px;margin-top:34px;height:52px;padding:0 24px;border-radius:14px;background:linear-gradient(#1d1f27,#121318);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 0 1px rgba(255,255,255,.1);color:#fff;font-size:16px;font-weight:500;transition:transform .5s var(--ease),box-shadow .3s}
+.dock-btn:hover{box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 0 0 1px rgba(151,230,255,.5),0 0 40px rgba(151,230,255,.18)}
+.dock-btn.done{color:var(--sky)}
+.dock{display:inline-flex;gap:clamp(8px,1.2vw,14px);margin-top:56px;padding:clamp(8px,1vw,12px);border-radius:24px;background:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 0 1px rgba(255,255,255,.08),0 30px 80px rgba(0,0,0,.6);backdrop-filter:blur(14px)}
+.app-i{position:relative;width:clamp(48px,5.6vw,68px);height:clamp(48px,5.6vw,68px);border-radius:24%;display:grid;place-items:center;transition:transform .45s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.dock:hover .app-i{transform:translateY(-3px)}
+.dock .app-i:hover{transform:translateY(-12px) scale(1.18)}
+.app-i svg{width:58%;height:58%}
+.app-i.kai{background:#fff}
+.app-i.kai svg{color:#000}
+.app-i.kai::after{content:"";position:absolute;bottom:-9px;width:4px;height:4px;border-radius:50%;background:#bfc3cf}
+.app-i.kai.pop{animation:pop 1.2s var(--ease)}
+@keyframes pop{0%{transform:translateY(-60px) scale(.4);opacity:0}60%{transform:translateY(6px) scale(1.06);opacity:1}100%{transform:none}}
+.dock-s p.dock-cap{margin-top:30px;color:#6f7590;line-height:2;font-size:11px;max-width:none}
+.how{display:none;max-width:520px;margin:22px auto 0;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.06);box-shadow:0 0 0 1px rgba(255,255,255,.08);color:#d7dbe7;font-size:15px;line-height:1.6}
+.how.on{display:block}
+
 /* ---------- final call ---------- */
 .cta{position:relative;margin:clamp(70px,10vh,120px) var(--g) 0;border-radius:32px;overflow:hidden;background:var(--ink);color:#fff;min-height:clamp(520px,82vh,860px);display:flex;flex-direction:column;justify-content:space-between;padding:clamp(28px,4vw,60px)}
 .cta canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
@@ -157,11 +196,11 @@ html.loading #loader{display:block}
 .cta h2{font-size:clamp(50px,8.6vw,150px);font-weight:500;letter-spacing:-.06em;line-height:.9;max-width:11ch}
 .cta .row2{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
 .cta p{max-width:420px;color:#aab0c8;font-size:17px;line-height:1.55}
-.big{width:clamp(150px,15vw,220px);height:clamp(150px,15vw,220px);border-radius:50%;background:var(--sky);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;line-height:1.7;transition:background .4s,color .4s,transform .6s var(--ease);will-change:transform}
+.big{width:clamp(150px,15vw,220px);height:clamp(150px,15vw,220px);border-radius:50%;background:var(--sky);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;transition:background .4s,transform .6s var(--ease);will-change:transform}
 .big:hover{background:#fff}
 .big b{display:block;font-family:var(--sans);text-transform:none;font-size:clamp(20px,1.8vw,26px);letter-spacing:-.02em;font-weight:500}
 
-/* ---------- footer ---------- */
+/* footer */
 footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
 .f-cols{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:30px;padding-bottom:50px}
 .f-cols p{font-size:15px;line-height:1.55;color:var(--mute);max-width:330px}
@@ -172,21 +211,27 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
 .word svg{width:.62em;height:.62em;flex:none;margin-bottom:.03em}
 .f-bot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:26px;color:var(--mute-2)}
 
-/* reveal */
+/* cursor + reveal */
+.cur{position:fixed;left:0;top:0;z-index:300;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;border:1.5px solid #fff;pointer-events:none;transition:width .35s var(--ease),height .35s var(--ease),margin .35s var(--ease),opacity .3s;mix-blend-mode:difference;display:none}
+.cur.big{opacity:0}
+@media (pointer:fine){.cur{display:block}}
 .rv{opacity:0;transform:translateY(46px);transition:opacity 1.1s var(--ease),transform 1.1s var(--ease)}
 .rv.in{opacity:1;transform:none}
 
 @media (max-width:900px){
-  .hero .copy{grid-template-columns:minmax(0,1fr)}
-  .hero .meta .hide-m{display:none}
-  .about{grid-template-columns:minmax(0,1fr);gap:18px}
+  .hero-copy{grid-template-columns:minmax(0,1fr)}
+  .pin .meta .hide-m{display:none}
+  .point{grid-template-columns:minmax(0,1fr);gap:18px}
+  .split,.split[data-open]{grid-template-columns:minmax(0,1fr);min-height:0}
+  .side-c{min-height:420px}
+  .side-c .more{max-height:420px;opacity:1}
   .grid{grid-template-columns:minmax(0,1fr)}
   .grid .card:nth-child(even){margin-top:0}
   .f-cols{grid-template-columns:repeat(2,minmax(0,1fr))}
   .f-cols>div:first-child{grid-column:1/-1}
 }
-@media (max-width:560px){.top .pill.sky{display:none}.hero .scroll{display:none}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.h1 .ln>span,.fade,.rv{transform:none!important;opacity:1!important}.about p .w{color:var(--ink)}.clip{clip-path:none}}
+@media (max-width:560px){.top .pill.sky{display:none}.hint{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.h1 .ln>span,.fade,.rv{transform:none!important;opacity:1!important}.point p.big-p .w{color:var(--ink)}.clip{clip-path:none}.intro{height:auto}.pin{position:relative}}
 </style>
 <script>try{if(!sessionStorage.getItem('kairos-intro')&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('loading')}catch(e){}</script>
 </head>
@@ -201,36 +246,64 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
   <a class="brand" href="./" aria-label="Kairos home"><svg><use href="#mark"/></svg>kairos</a>
   <div class="top-r"><a class="pill sky" href="app/"><span class="dot"></span>Enter app</a><button class="mbtn" id="mbtn" aria-label="Menu" aria-expanded="false"><span><i></i><i></i></span></button></div>
 </header>
-
 <div id="menu" aria-hidden="true">
-  <nav>
-    <a href="./"><span>Home</span></a><a href="tour"><span>The tour</span></a><a href="tour#record"><span>Track record</span></a><a href="tour#get"><span>Download</span></a><a href="app/"><span>Enter the app ↗</span></a>
-  </nav>
+  <nav><a href="./"><span>Home</span></a><a href="tour"><span>The tour</span></a><a href="tour#record"><span>Track record</span></a><a href="#dock"><span>Keep it in your Dock</span></a><a href="app/"><span>Enter the app ↗</span></a></nav>
   <div class="foot lbl"><span>Local-first · paper before real</span><span>© 2026 Kairos</span></div>
 </div>
 
 <main>
-<section class="hero" id="hero" aria-label="Kairos">
-  <div class="glow" aria-hidden="true"></div>
-  <canvas id="pix" class="pix" data-mode="hero" data-dark="1" aria-hidden="true"></canvas>
-  <canvas id="gl" aria-hidden="true"></canvas>
-  <div class="meta lbl"><span>( Trading journal · AI agents )</span><span class="hide-m">Paper first — real money later</span><span>2026</span></div>
-  <div class="copy">
-    <h1 class="h1"><span class="ln"><span>Trade the</span></span><span class="ln"><span><em>right</em> moment.</span></span></h1>
-    <div class="side fade">
-      <p>A journal you own in Obsidian, AI agents that learn from it on paper, and real money only after they beat the marks you set.</p>
-      <div class="acts"><a class="pill sky" href="app/"><span class="dot"></span>Enter the app</a><a class="pill ghost-d" href="tour">The tour</a></div>
-      <span class="scroll lbl"><i>↓</i>Scroll to explore</span>
+<section class="intro" id="intro" aria-label="Kairos">
+  <div class="pin">
+    <canvas id="px" aria-hidden="true"></canvas>
+    <div class="meta lbl"><span>( Trading journal · AI agents )</span><span class="hide-m">Paper first — real money later</span><span>2026</span></div>
+    <div class="hero-copy" id="heroCopy">
+      <h1 class="h1"><span class="ln"><span>Trade the</span></span><span class="ln"><span><em>right</em> moment.</span></span></h1>
+      <div class="side fade">
+        <p>Every revenge entry, every moved stop, written down. AI agents learn from your journal on paper, and touch real money only after they beat your marks.</p>
+        <div class="acts"><a class="pill sky" href="app/"><span class="dot"></span>Enter the app</a><a class="pill white" href="tour">The tour</a></div>
+      </div>
     </div>
+    <div class="formed" id="formed"><h2>Every trade you log sharpens the picture.</h2><p class="lbl">( Kairos · the right moment, pixel by pixel )</p></div>
+    <div class="tick lbl" aria-label="Live prices"><span class="live"><i></i>Argus · live</span><div class="tr" id="tk"><span>Loading prices…</span></div></div>
   </div>
-  <div class="tick lbl" aria-label="Live prices"><span class="live"><i></i>Argus · live</span><div class="tr" id="tk"><span>Loading prices…</span></div></div>
 </section>
 
-<section class="about" aria-label="About">
-  <span class="k lbl">( 01 ) About Kairos</span>
+<section class="point" aria-labelledby="pointT">
+  <span class="k lbl">( 01 ) The point</span>
   <div>
-    <p id="stmt">Kairos is the Greek god of the <span class="b">right moment.</span> Your agents wait for it, prove it on paper in public, and only then ask you for <span class="b">real money.</span></p>
-    <a class="pill white rv" href="tour"><span class="dot"></span>Take the tour</a>
+    <h2 id="pointT" class="rv">Stop being the <em>exit liquidity.</em></h2>
+    <p class="big-p" id="stmt">It was never you against the market. It was you against your last five trades: the revenge entry, the stop you moved, the 3 a.m. crash out. Kairos writes every one of them down, and the agents learn the lesson so you don't pay for it twice.</p>
+    <a class="pill white rv" href="tour#record"><span class="dot"></span>See the receipts</a>
+  </div>
+</section>
+
+<section class="sides" aria-labelledby="sidesT">
+  <div class="sides-h rv"><h2 id="sidesT">Pick a side.</h2><span class="lbl" style="color:var(--mute-2)">( Click either one )</span></div>
+  <div class="split rv" id="split">
+    <button class="side-c you" data-side="you" aria-expanded="false">
+      <span class="tap lbl">↗</span>
+      <div><span class="lbl">You, on tilt</span><h3>All tuition.<br>No payout.</h3><p class="peek lbl">FOMO · moved stop · revenge · overtrade →</p></div>
+      <div class="more"><ul>
+        <li><b>FOMO</b>Aped in at the top because the candle was green.</li>
+        <li><b>MOVED STOP</b>"It'll come back." It didn't.</li>
+        <li><b>REVENGE</b>Two losses, then size doubled to win it back.</li>
+        <li><b>OVERTRADE</b>Fourteen trades, zero setups. F-tier day.</li>
+        <li><b>NO JOURNAL</b>Same mistake next week, same price.</li>
+      </ul></div>
+      <span class="num">−1.39R</span>
+    </button>
+    <button class="side-c k" data-side="k" aria-expanded="false">
+      <span class="tap lbl">↗</span>
+      <div><span class="lbl">You, with Kairos</span><h3>A+ setups.<br>Or nothing.</h3><p class="peek lbl">Stop first · no chase · anti-tilt · paper first →</p></div>
+      <div class="more"><ul>
+        <li><b>STOP FIRST</b>The stop is set before the entry, at structure. Brake checks it.</li>
+        <li><b>NO CHASE</b>Already up 8%? Too late. Brake says no.</li>
+        <li><b>ANTI-TILT</b>Two losses in a row and the day is over.</li>
+        <li><b>LESSONS</b>Every closed trade leaves a rule the agents read next time.</li>
+        <li><b>PAPER FIRST</b>50 trades, 30 days, your marks. Then real money.</li>
+      </ul></div>
+      <span class="num">2.5R+</span>
+    </button>
   </div>
 </section>
 
@@ -248,7 +321,24 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
   </div>
 </section>
 
-<section class="mq" aria-hidden="true"><div class="row" id="mq"><span>Paper first <b>✦</b></span><span class="o">Real money later <b>✦</b></span><span>Paper first <b>✦</b></span><span class="o">Real money later <b>✦</b></span></div></section>
+<section class="mq" aria-hidden="true"><div class="row" id="mq"><span>Stop being the exit liquidity <b>✦</b></span><span class="o">Paper first <b>✦</b></span><span>Stop being the exit liquidity <b>✦</b></span><span class="o">Paper first <b>✦</b></span></div></section>
+
+<section class="dock-s" id="dock" aria-labelledby="dockT">
+  <span class="lbl">Nothing to install</span>
+  <h2 id="dockT">Keep Kairos in your Dock.</h2>
+  <div class="rule"></div>
+  <p>Skip the app store. Your browser can pin Kairos next to the apps you already use: its own icon, its own window, no tabs, no address bar. Ten seconds to add, one drag to remove.</p>
+  <button class="dock-btn" id="dockBtn">Put Kairos in my Dock <span>→</span></button>
+  <div class="how" id="how" role="status"></div>
+  <div><div class="dock" aria-hidden="true">
+    <span class="app-i" style="background:linear-gradient(160deg,#6fd8fb,#0055ff)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 7h16v12H4z"/><path d="M4 7l3-3h10l3 3"/></svg></span>
+    <span class="app-i" style="background:linear-gradient(160deg,#fff,#dfe3ea)"><svg viewBox="0 0 24 24" fill="none" stroke="#0055ff" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/></svg></span>
+    <span class="app-i kai" id="kaiIcon"><svg><use href="#mark"/></svg></span>
+    <span class="app-i" style="background:linear-gradient(160deg,#9cf09a,#1fae4c)"><svg viewBox="0 0 24 24" fill="#fff"><path d="M4 6h16v10H9l-5 4z"/></svg></span>
+    <span class="app-i" style="background:linear-gradient(160deg,#ffe27a,#f5a524)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M6 4h12v16H6zM9 9h6M9 13h6M9 17h3"/></svg></span>
+  </div></div>
+  <p class="dock-cap lbl">Shown in a macOS Dock. On Windows it goes in the taskbar,<br>on iPhone and iPad on the Home Screen.</p>
+</section>
 
 <section class="cta" aria-labelledby="ctaT">
   <canvas class="pix" data-mode="cta" aria-hidden="true"></canvas>
@@ -263,7 +353,7 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
     <div><p>A local trading journal in Obsidian, and AI agents that have to earn your money on paper before they ever touch it for real. Not financial advice.</p></div>
     <div><h6>PRODUCT</h6><a href="tour">The tour</a><a href="tour#memecoins">Memecoins</a><a href="tour#news">Argus</a></div>
     <div><h6>PROOF</h6><a href="tour#record">Track record</a><a href="tour#rules">Rules</a><a href="tour#money">Risk warning</a></div>
-    <div><h6>START</h6><a href="app/">Enter the app</a><a href="tour#get">Download</a><a href="https://github.com/neoonchain/agentsIA">GitHub</a></div>
+    <div><h6>START</h6><a href="app/">Enter the app</a><a href="#dock">Keep it in your Dock</a><a href="tour#get">Download</a></div>
   </div>
   <div class="word" aria-hidden="true"><svg><use href="#mark"/></svg>kairos</div>
   <div class="f-bot lbl"><span>© 2026 Kairos</span><span>Local-first · paper before real</span></div>
@@ -273,30 +363,26 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
 <script>
 (() => {
 const root = document.documentElement, reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), ease = t => 1 - Math.pow(1 - t, 3), easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const start = () => document.body.classList.add('ready');
 
-/* ---------- the pixel texture (bands of blue squares, from the first Kairos page) ---------- */
+/* the pixel texture (loader + call to action) */
 function pixelWave(cv){
-  const ctx = cv.getContext('2d'), mode = cv.dataset.mode, CELL = 20, dark = mode !== 'hero' || cv.dataset.dark === '1';
+  const ctx = cv.getContext('2d'), mode = cv.dataset.mode, CELL = 20;
   let W, H, cols, rows, t = Math.random() * 100;
   const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
   function size(){ const r = cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); W = r.width; H = r.height; cv.width = W * d; cv.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); cols = Math.ceil(W / CELL) + 1; rows = Math.ceil(H / CELL) + 1; }
-  const center = u => mode === 'hero' ? .5 - u * .3 + .08 * Math.sin(u * 7 + t * .35) + .04 * Math.sin(u * 21 - t * .5) : (mode === 'cta' ? .665 : .62) + .1 * Math.sin(u * 6.5 + t * .3 + 1) + .05 * Math.sin(u * 17 - t * .45);
+  const center = u => (mode === 'cta' ? .665 : .62) + .1 * Math.sin(u * 6.5 + t * .3 + 1) + .05 * Math.sin(u * 17 - t * .45);
   function draw(){
     ctx.clearRect(0, 0, W, H);
-    const band = mode === 'hero' ? .16 : mode === 'cta' ? .065 : .14;
-    for (let i = 0; i < cols; i++) {
-      const u = i / cols, cy = center(u) * H, bw = band * H * (mode === 'hero' ? (.7 + .6 * u) : 1);
-      for (let j = 0; j < rows; j++) {
-        const x = i * CELL, y = j * CELL, d = Math.abs(y - cy) / bw, n = hash(i, j), fl = .5 + .5 * Math.sin(t * 1.3 + n * 40);
-        let v = 1 - d + (n - .5) * .55 + (fl - .5) * .25;
-        if (mode === 'hero' && y > H * .6 && x < W * .7) v -= 1.1 * Math.min(1, (y - H * .6) / (H * .08));
-        if (v > .62) { ctx.fillStyle = u > .55 ? '#0055ff' : (dark ? '#1d3cb0' : '#101638'); ctx.fillRect(x + 3, y + 3, 13, 13); }
+    const band = mode === 'cta' ? .065 : .14;
+    for (let i = 0; i < cols; i++) { const u = i / cols, cy = center(u) * H, bw = band * H;
+      for (let j = 0; j < rows; j++) { const x = i * CELL, y = j * CELL, d = Math.abs(y - cy) / bw, n = hash(i, j), fl = .5 + .5 * Math.sin(t * 1.3 + n * 40);
+        const v = 1 - d + (n - .5) * .55 + (fl - .5) * .25;
+        if (v > .62) { ctx.fillStyle = u > .55 ? '#0055ff' : '#1d3cb0'; ctx.fillRect(x + 3, y + 3, 13, 13); }
         else if (v > .42) { ctx.fillStyle = u > .4 ? '#4d8dff' : '#2a4dd0'; ctx.fillRect(x + 4, y + 4, 10, 10); }
         else if (v > .22 && n > .45) { ctx.fillStyle = '#97e6ff'; ctx.fillRect(x + 6, y + 6, 6, 6); }
-        else { ctx.fillStyle = dark ? 'rgba(151,230,255,.16)' : '#dfe2e8'; ctx.fillRect(x + 8, y + 8, 2, 2); }
-      }
-    }
+        else { ctx.fillStyle = 'rgba(151,230,255,.16)'; ctx.fillRect(x + 8, y + 8, 2, 2); } } }
   }
   let vis = true; new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(cv);
   size(); draw(); addEventListener('resize', () => { size(); draw(); });
@@ -304,63 +390,133 @@ function pixelWave(cv){
 }
 document.querySelectorAll('canvas.pix').forEach(pixelWave);
 
-/* ---------- loader 0 → 100 ---------- */
+/* ---------- the intro: the original pixel wave (ink on the left, blue on the right) assembles into the Kairos mark ---------- */
+const intro = document.getElementById('intro'), cv = document.getElementById('px'), ctx = cv.getContext('2d');
+const heroCopy = document.getElementById('heroCopy'), formed = document.getElementById('formed');
+const CELL = 20, hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+let W = 0, H = 0, cols = 0, rows = 0, t = Math.random() * 100, parts = [], taken = new Set(), mx = -9999, my = -9999;
+const center = u => .56 - u * .48 + .07 * Math.sin(u * 9 + t * .35) + .04 * Math.sin(u * 23 - t * .5);
+function cellValue(i, j){
+  const u = i / cols, cy = center(u) * H, bw = .17 * H * (.75 + .6 * u), x = i * CELL, y = j * CELL, n = hash(i, j), fl = .5 + .5 * Math.sin(t * 1.3 + n * 40);
+  let v = 1 - Math.abs(y - cy) / bw + (n - .5) * .55 + (fl - .5) * .25;
+  if (y > H * .5 && x < W * .6) v -= .9 * Math.min(1, (y - H * .5) / (H * .08));
+  return { v, u, n };
+}
+function cellStyle({ v, u, n }){ // the original palette: ink on the left, blue on the right
+  if (v > .62) return [u > .55 ? '#0055ff' : '#101638', 13, 3];
+  if (v > .42) return [u > .4 ? '#4d8dff' : '#2a4dd0', 10, 4];
+  if (v > .22 && n > .45) return ['#97e6ff', 6, 6];
+  return ['#d3d6de', 2, 8];
+}
+function build(){
+  const d = Math.min(2, devicePixelRatio || 1); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * d; cv.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0);
+  cols = Math.ceil(W / CELL) + 1; rows = Math.ceil(H / CELL) + 1;
+  // sample the logo on a fine grid, centred
+  const S = Math.min(W * (W < 700 ? .74 : .4), H * .56), G = Math.max(7, Math.round(S / 38));
+  const off = document.createElement('canvas'); off.width = off.height = Math.ceil(S); const oc = off.getContext('2d');
+  const vb = document.querySelector('#mark').getAttribute('viewBox').split(' ').map(Number), path = new Path2D(document.querySelector('#mark path').getAttribute('d'));
+  oc.scale(S / vb[2], S / vb[3]); oc.translate(-vb[0], -vb[1]); oc.fill(path, 'evenodd');
+  const img = oc.getImageData(0, 0, off.width, off.height).data, ox = W / 2 - S / 2, oy = H * .45 - S / 2, targets = [];
+  for (let y = G / 2; y < S; y += G) for (let x = G / 2; x < S; x += G) if (img[(Math.floor(y) * off.width + Math.floor(x)) * 4 + 3] > 120) targets.push({ x: ox + x - G * .39, y: oy + y - G * .39, s: G * .78 });
+  // sources: the band's squares, so the wave itself flies into the mark (left squares to the left of the logo)
+  const cands = [];
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { const u = i / cols, cy = (.56 - u * .48) * H, bw = .17 * H * (.75 + .6 * u), sv = 1 - Math.abs(j * CELL - cy) / bw + (hash(i, j) - .5) * .55; if (sv > .3) cands.push({ i, j, sv }); }
+  cands.sort((a, b) => b.sv - a.sv);
+  const src = cands.slice(0, targets.length); while (src.length < targets.length) src.push({ i: Math.floor(Math.random() * cols), j: Math.floor(rows * (.2 + Math.random() * .4)) });
+  src.sort((a, b) => a.i - b.i || a.j - b.j); targets.sort((a, b) => a.x - b.x || a.y - b.y);
+  taken = new Set(src.map(s => s.i + ',' + s.j));
+  const tc1 = hex('#101638'), tc2 = hex('#0055ff');
+  parts = targets.map((tg, k) => { const s = src[k], q = (tg.x - ox) / S; return { i: s.i, j: s.j, tx: tg.x, ty: tg.y, ts: tg.s, tcol: tc1.map((c, z) => Math.round(c + (tc2[z] - c) * clamp(q * 1.25 - .1))), delay: hash(s.i, s.j) * .35 + (s.i / cols) * .15, ox: 0, oy: 0 }; });
+}
+build(); addEventListener('resize', build);
+addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; }, { passive: true });
+addEventListener('pointerleave', () => { mx = my = -9999; });
+
+function introProgress(){ const r = intro.getBoundingClientRect(); return clamp(-r.top / Math.max(1, intro.offsetHeight - innerHeight)); }
+function drawIntro(){
+  const P = reduce ? 1 : introProgress(), m = clamp(P / .55), out = clamp((P - .8) / .2); // m: assembling, out: leaving
+  ctx.clearRect(0, 0, W, H);
+  const fadeBg = 1 - clamp(m * 1.6);
+  // the rest of the wave dissolves while the mark forms
+  if (fadeBg > 0) { ctx.globalAlpha = fadeBg;
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { if (m > 0 && taken.has(i + ',' + j)) continue; const [c, s, o] = cellStyle(cellValue(i, j)); ctx.fillStyle = c; ctx.fillRect(i * CELL + o, j * CELL + o, s, s); }
+    ctx.globalAlpha = 1; }
+  // the travelling squares
+  const lift = out * H * .12, shrink = 1 - out * .15;
+  for (const p of parts) {
+    const k = easeIO(clamp((m - p.delay) / (1 - .5)));
+    const cs = cellStyle(cellValue(p.i, p.j)), sx = p.i * CELL + cs[2], sy = p.j * CELL + cs[2], ss = cs[1];
+    if (m === 0) { ctx.fillStyle = cs[0]; ctx.fillRect(sx, sy, ss, ss); continue; }
+    // a gentle arc on the way, and the cursor pushes formed squares aside
+    let x = sx + (p.tx - sx) * k + Math.sin(k * Math.PI) * (p.delay - .25) * 160, y = sy + (p.ty - sy) * k - Math.sin(k * Math.PI) * 60 * (1 - p.delay);
+    if (k > .98) { const dx = x - mx, dy = y - my, dd = Math.hypot(dx, dy); const f = dd < 110 ? (1 - dd / 110) * 26 : 0; p.ox += ((dd ? dx / dd * f : 0) - p.ox) * .15; p.oy += ((dd ? dy / dd * f : 0) - p.oy) * .15; x += p.ox; y += p.oy; }
+    const s = (ss + (p.ts - ss) * k) * shrink;
+    const c0 = hex(cs[0].length === 7 ? cs[0] : '#d3d6de'), col = c0.map((c, z) => Math.round(c + (p.tcol[z] - c) * k));
+    ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+    const cxm = W / 2, cym = H * .45; ctx.fillRect(cxm + (x - cxm) * shrink, cym + (y - cym) * shrink - lift, s, s);
+  }
+  // text choreography
+  heroCopy.style.opacity = 1 - clamp(P / .18); heroCopy.style.transform = `translateY(${-clamp(P / .18) * 60}px)`;
+  const f = clamp((P - .5) / .15) * (1 - out); formed.style.opacity = f; formed.style.transform = `translateY(${(1 - f) * 24 - lift}px)`;
+}
+(function loop(){ t += .012; drawIntro(); if (!reduce) requestAnimationFrame(loop); })();
+
+/* loader 0 → 100 */
 if (root.classList.contains('loading')) {
   const n = document.getElementById('ldN'), bar = document.getElementById('ldB'), t0 = performance.now(), D = 1800;
-  (function step(t){ const p = Math.min(1, (t - t0) / D), v = Math.round((1 - Math.pow(1 - p, 3)) * 100); n.textContent = v; bar.style.width = v + '%';
+  (function step(ts){ const p = Math.min(1, (ts - t0) / D), v = Math.round((1 - Math.pow(1 - p, 3)) * 100); n.textContent = v; bar.style.width = v + '%';
     if (p < 1) return requestAnimationFrame(step);
     setTimeout(() => { document.getElementById('loader').classList.add('out'); setTimeout(start, 300); setTimeout(() => root.classList.remove('loading'), 1200); try { sessionStorage.setItem('kairos-intro', '1'); } catch (e) {} }, 160);
   })(t0);
 } else requestAnimationFrame(() => requestAnimationFrame(start));
 
-/* ---------- smooth scroll + header ---------- */
+/* smooth scroll, header, menu */
 let lenis = null;
-if (!reduce && window.Lenis) { lenis = new Lenis({ lerp: 0.085 }); const raf = t => { lenis.raf(t); requestAnimationFrame(raf); }; requestAnimationFrame(raf); }
-const top = document.getElementById('top'), heroEl = document.getElementById('hero'); let lastY = 0;
-const darkTop = () => top.classList.toggle('on-dark', scrollY < heroEl.offsetHeight - 60 && !root.classList.contains('menu-open')); darkTop(); addEventListener('scroll', darkTop, { passive: true });
-addEventListener('scroll', () => { const y = scrollY; top.classList.toggle('hide', y > 160 && y > lastY && !root.classList.contains('menu-open')); lastY = y; }, { passive: true });
-
-/* ---------- menu ---------- */
+if (!reduce && window.Lenis) { lenis = new Lenis({ lerp: 0.085 }); const raf = ts => { lenis.raf(ts); requestAnimationFrame(raf); }; requestAnimationFrame(raf); }
+const top = document.getElementById('top'); let lastY = 0;
+addEventListener('scroll', () => { const y = scrollY, past = y > intro.offsetHeight - innerHeight * .5; top.classList.toggle('solid', past); top.classList.toggle('hide', past && y > lastY + 2 && !root.classList.contains('menu-open')); lastY = y; }, { passive: true });
 const mbtn = document.getElementById('mbtn'), menu = document.getElementById('menu');
 const setMenu = on => { root.classList.toggle('menu-open', on); mbtn.setAttribute('aria-expanded', on); menu.setAttribute('aria-hidden', !on); if (lenis) on ? lenis.stop() : lenis.start(); };
 mbtn.onclick = () => setMenu(!root.classList.contains('menu-open'));
 menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setMenu(false)));
 addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
 
-/* ---------- reveals ---------- */
+/* reveals */
 const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); e.target.querySelectorAll('.clip').forEach(c => c.classList.add('in')); io.unobserve(e.target); } }), { rootMargin: '0px 0px -12% 0px' });
 document.querySelectorAll('.rv').forEach(el => io.observe(el));
 
-/* ---------- statement: words light up as it scrolls through ---------- */
-const stmt = document.getElementById('stmt');
-(function split(node, blue){ [...node.childNodes].forEach(c => {
-  if (c.nodeType === 3) { const f = document.createDocumentFragment(); c.textContent.split(/(\s+)/).forEach(w => { if (!w) return; if (/^\s+$/.test(w)) f.append(w); else { const s = document.createElement('span'); s.className = 'w' + (blue ? ' b' : ''); s.textContent = w; f.append(s); } }); c.replaceWith(f); }
-  else split(c, c.classList && c.classList.contains('b')); }); })(stmt, false);
+/* the point: words light up, the bad habits in red */
+const stmt = document.getElementById('stmt'), RED = /^(revenge|entry,|moved,|stop|crash|out\.)$/i;
+(function split(node){ [...node.childNodes].forEach(c => { if (c.nodeType === 3) { const f = document.createDocumentFragment(); c.textContent.split(/(\s+)/).forEach(w => { if (!w) return; if (/^\s+$/.test(w)) f.append(w); else { const s = document.createElement('span'); s.className = 'w' + (RED.test(w) ? ' r' : ''); s.textContent = w; f.append(s); } }); c.replaceWith(f); } else split(c); }); })(stmt);
 const words = [...stmt.querySelectorAll('.w')];
 
-/* ---------- marquee driven by scroll speed, cards parallax, magnetic buttons ---------- */
+/* pick a side */
+const split = document.getElementById('split');
+split.querySelectorAll('.side-c').forEach(b => b.addEventListener('click', () => { const s = b.dataset.side, open = split.dataset.open === s ? '' : s; split.dataset.open = open; split.querySelectorAll('.side-c').forEach(x => x.setAttribute('aria-expanded', x.dataset.side === open)); }));
+
+/* marquee, parallax, magnetic buttons */
 const mq = document.getElementById('mq'); let mqX = 0, prevY = scrollY, vel = 0;
 const imgs = [...document.querySelectorAll('.card .img img')];
-function frame(){
+(function frame(){
   const y = scrollY, dy = y - prevY; prevY = y; vel += (dy - vel) * .12;
   mqX -= 1.1 + Math.abs(vel) * .35; const w = mq.scrollWidth / 2; if (-mqX > w) mqX += w; mq.style.transform = `translateX(${mqX}px)`;
-  const r = stmt.getBoundingClientRect(), p = Math.min(1, Math.max(0, (innerHeight * .9 - r.top) / (r.height + innerHeight * .3))), k = Math.round(p * words.length);
+  const r = stmt.getBoundingClientRect(), p = clamp((innerHeight * .9 - r.top) / (r.height + innerHeight * .3)), k = Math.round(p * words.length);
   words.forEach((wd, i) => wd.classList.toggle('on', i < k));
-  for (const im of imgs) { const b = im.parentElement.getBoundingClientRect(); const q = (b.top + b.height / 2 - innerHeight / 2) / innerHeight; im.style.setProperty('--py', `${(-q * 7).toFixed(2)}%`); }
+  for (const im of imgs) { const b = im.parentElement.getBoundingClientRect(); im.style.setProperty('--py', `${(-(b.top + b.height / 2 - innerHeight / 2) / innerHeight * 7).toFixed(2)}%`); }
   if (!reduce) requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);
-if (!reduce && matchMedia('(pointer:fine)').matches) document.querySelectorAll('.pill,.big,.mbtn').forEach(b => {
-  const k = b.classList.contains('big') ? .3 : .22;
+})();
+if (!reduce && matchMedia('(pointer:fine)').matches) document.querySelectorAll('.pill,.big,.mbtn,.dock-btn').forEach(b => {
+  const k = b.classList.contains('big') ? .3 : .2;
   b.addEventListener('pointermove', e => { const r = b.getBoundingClientRect(); b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * k}px,${(e.clientY - r.top - r.height / 2) * k}px)`; });
   b.addEventListener('pointerleave', () => { b.style.transform = ''; });
 });
 
-/* custom cursor */
+/* cursor */
 const cur = document.getElementById('cur'); let cx = -100, cy = -100, tx = -100, ty = -100;
 if (matchMedia('(pointer:fine)').matches && !reduce) {
   addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; }, { passive: true });
-  document.querySelectorAll('a,button,.card').forEach(el => { el.addEventListener('pointerenter', () => cur.classList.toggle('big', el.classList.contains('card'))); el.addEventListener('pointerleave', () => cur.classList.remove('big')); });
+  document.querySelectorAll('.card').forEach(el => { el.addEventListener('pointerenter', () => cur.classList.add('big')); el.addEventListener('pointerleave', () => cur.classList.remove('big')); });
   (function mv(){ cx += (tx - cx) * .2; cy += (ty - cy) * .2; cur.style.transform = `translate(${cx}px,${cy}px)`; requestAnimationFrame(mv); })();
 }
 
@@ -376,100 +532,29 @@ async function prices(){
 }
 prices(); setInterval(prices, 30000);
 
+/* keep Kairos in your Dock: install the web app (PWA), or explain how on browsers without a prompt */
+let deferred = null;
+const dockBtn = document.getElementById('dockBtn'), how = document.getElementById('how'), kai = document.getElementById('kaiIcon');
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+const installed = () => { dockBtn.classList.add('done'); dockBtn.innerHTML = 'Kairos is in your Dock <span>✓</span>'; kai.classList.remove('pop'); void kai.offsetWidth; kai.classList.add('pop'); };
+if (standalone) installed();
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; });
+addEventListener('appinstalled', installed);
+dockBtn.addEventListener('click', async () => {
+  if (deferred) { deferred.prompt(); const { outcome } = await deferred.userChoice; deferred = null; if (outcome === 'accepted') installed(); return; }
+  const ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const safari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua), firefox = /Firefox/.test(ua);
+  how.innerHTML = ios ? 'On iPhone or iPad: tap <b>Share</b>, then <b>Add to Home Screen</b>.'
+    : safari ? 'In Safari on a Mac: open the <b>File</b> menu, then <b>Add to Dock</b>.'
+    : firefox ? 'Firefox can’t add web apps to the Dock. Open this page in Chrome, Edge or Safari and press the button again.'
+    : 'Use the install icon at the right of the address bar, or the browser menu → <b>Install Kairos</b>. If you don’t see it, Kairos may already be installed.';
+  how.classList.add('on');
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
 /* a static host without the app: send "Enter app" to the downloads */
 fetch('app/', { method: 'HEAD' }).then(r => { if (!r.ok) throw 0; }).catch(() => document.querySelectorAll('a[href="app/"]').forEach(a => { a.href = 'tour#get'; }));
 })();
-</script>
-
-<script type="module">
-/* ---------- the 3D hero: a glossy Kairos mark with candlesticks and coins that react to the cursor ---------- */
-import * as THREE from 'three';
-import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const cv = document.getElementById('gl'), hero = document.getElementById('hero');
-let renderer;
-try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: 'high-performance' }); } catch (e) { cv.remove(); throw e; }
-renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
-const scene = new THREE.Scene();
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
-const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100); camera.position.set(0, 0, 14);
-const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(4, 6, 8); scene.add(key);
-const rim = new THREE.DirectionalLight(0x4d8dff, 2.4); rim.position.set(-6, -2, -4); scene.add(rim);
-const fill = new THREE.PointLight(0x97e6ff, 30, 30); fill.position.set(3, 1, 5); scene.add(fill);
-scene.add(new THREE.AmbientLight(0x8fb2ff, 0.25));
-
-const mat = (color, o = {}) => new THREE.MeshPhysicalMaterial({ color, roughness: 0.16, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.06, ...o });
-const COLORS = { up: 0x22c58b, down: 0xf0503c, blue: 0x0055ff, sky: 0x97e6ff, ink: 0x101638 };
-const group = new THREE.Group(); scene.add(group);
-const bodies = [];
-
-// the Kairos mark, extruded from the logo path
-const markVB = document.querySelector('#mark').getAttribute('viewBox').split(' ').map(Number), markD = document.querySelector('#mark path').getAttribute('d');
-const svg = new SVGLoader().parse(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${markVB.join(' ')}"><path fill-rule="evenodd" d="${markD}"/></svg>`);
-const shapes = svg.paths.flatMap(p => SVGLoader.createShapes(p));
-const mg = new THREE.ExtrudeGeometry(shapes, { depth: 26, bevelEnabled: true, bevelThickness: 7, bevelSize: 5, bevelSegments: 6, curveSegments: 40 });
-mg.center(); mg.scale(0.0175, -0.0175, 0.0175);
-const mark = new THREE.Mesh(mg, new THREE.MeshPhysicalMaterial({ color: 0x3d7bff, metalness: 1, roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.05, iridescence: 0.5, iridescenceIOR: 1.6 }));
-group.add(mark);
-mark.scale.setScalar(0.92);
-bodies.push({ m: mark, home: new THREE.Vector3(3.1, 0.35, 0), v: new THREE.Vector3(), r: 2.0, spin: new THREE.Vector3(), heavy: true });
-
-// candlesticks (capsule body + wick) and coins
-function candle(up, len){
-  const g = new THREE.Group(), c = up ? COLORS.up : COLORS.down;
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, len, 10, 24), new THREE.MeshPhysicalMaterial({ color: c, transmission: 0.9, thickness: 0.6, roughness: 0.08, ior: 1.45, clearcoat: 1, attenuationColor: c, attenuationDistance: 0.8, emissive: c, emissiveIntensity: 0.12 }));
-  const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, len + 1.1, 12), new THREE.MeshPhysicalMaterial({ color: 0xdfe8ff, metalness: 1, roughness: 0.2 }));
-  g.add(body, wick); return g;
-}
-function coin(color){ const g = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.12, 64), new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness: 0.18, clearcoat: 1 })); g.rotation.x = Math.PI / 2; const w = new THREE.Group(); w.add(g); return w; }
-const small = innerWidth < 700, N = small ? 10 : 18;
-const rnd = (a, b) => a + Math.random() * (b - a);
-for (let i = 0; i < N; i++) {
-  const kind = i % 5 === 4 ? 'coin' : 'candle';
-  const m = kind === 'coin' ? coin([0xc9d6ff, 0x97e6ff, 0x6f9bff][i % 3]) : candle(Math.random() > .4, rnd(0.4, 1.5));
-  const a = (i / N) * Math.PI * 2, rad = rnd(2.6, 4.6);
-  const home = new THREE.Vector3(2.6 + Math.cos(a) * rad * 1.25, 0.9 + Math.sin(a) * rad * 0.72, rnd(-2.5, 1.5));
-  m.position.copy(home).add(new THREE.Vector3(rnd(-3, 3), rnd(-6, -3), 0));
-  m.rotation.set(rnd(-.6, .6), rnd(0, 6), rnd(-.5, .5));
-  group.add(m); bodies.push({ m, home, v: new THREE.Vector3(), r: kind === 'coin' ? 0.62 : 0.55, spin: new THREE.Vector3(rnd(-.4, .4), rnd(-.6, .6), rnd(-.3, .3)) });
-}
-
-// cursor in world space (on the z = 0 plane)
-const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(9, 9), plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), mouse = new THREE.Vector3(99, 99, 0);
-addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); }, { passive: true });
-function size(){ const w = hero.clientWidth, h = hero.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.position.z = w < 700 ? 22 : 14; group.position.x = w < 700 ? -2.6 : 0; group.position.y = w < 700 ? 2.2 : 0; camera.updateProjectionMatrix(); }
-size(); addEventListener('resize', size);
-
-let visible = true; new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(hero);
-const clock = new THREE.Clock(); const tmp = new THREE.Vector3();
-function tick(){
-  const dt = Math.min(0.033, clock.getDelta()), t = clock.elapsedTime;
-  ray.setFromCamera(ndc, camera); ray.ray.intersectPlane(plane, mouse); mouse.sub(group.position);
-  const sc = Math.min(1, scrollY / innerHeight);
-  for (const b of bodies) {
-    const home = tmp.copy(b.home); home.y += Math.sin(t * 0.8 + b.r * 7) * 0.18 + sc * (b.heavy ? 1.5 : 3 + b.r * 2); home.x += sc * (b.home.x - 2.6) * 0.6;
-    b.v.addScaledVector(home.sub(b.m.position), b.heavy ? 2.2 * dt : 3.2 * dt);
-    const dx = b.m.position.x - mouse.x, dy = b.m.position.y - mouse.y, d = Math.hypot(dx, dy), R = b.heavy ? 2.8 : 2.0;
-    if (d < R && d > 0.001) { const f = (1 - d / R) * (b.heavy ? 5 : 16) * dt; b.v.x += dx / d * f; b.v.y += dy / d * f; b.v.z += f * 0.4; }
-    for (const o of bodies) { if (o === b) continue; const ox = b.m.position.x - o.m.position.x, oy = b.m.position.y - o.m.position.y, oz = b.m.position.z - o.m.position.z, od = Math.hypot(ox, oy, oz), min = b.r + o.r;
-      if (od < min && od > 0.001) { const push = (min - od) * (o.heavy ? 6 : 3) * dt; b.v.x += ox / od * push; b.v.y += oy / od * push; b.v.z += oz / od * push; } }
-    b.v.multiplyScalar(b.heavy ? 0.9 : 0.93);
-    b.m.position.add(b.v);
-    if (b.heavy) continue;
-    b.m.rotation.x += (b.spin.x + b.v.y * 2) * dt; b.m.rotation.y += (b.spin.y + b.v.x * 2) * dt; b.m.rotation.z += b.spin.z * dt * 0.5;
-  }
-  const tx = Math.max(-1, Math.min(1, ndc.x)), ty = Math.max(-1, Math.min(1, ndc.y));
-  mark.rotation.y += ((Math.abs(ndc.x) > 2 ? Math.sin(t * .5) * .35 : tx * .55) - mark.rotation.y) * 0.05;
-  mark.rotation.x += ((Math.abs(ndc.y) > 2 ? 0 : -ty * .3) - mark.rotation.x) * 0.05;
-  mark.rotation.z = Math.sin(t * .3) * .04;
-  renderer.render(scene, camera);
-}
-function loop(){ requestAnimationFrame(loop); if (visible) tick(); }
-if (reduce) { for (const b of bodies) b.m.position.copy(b.home); renderer.render(scene, camera); } else loop();
 </script>
 </body>
 </html>

@@ -6,6 +6,9 @@
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png" />
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+<link rel="manifest" href="../manifest.webmanifest" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Kairos" />
 <title>Kairos | Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -28,5 +31,6 @@
 <div class="toast" id="toast" role="status"></div>
 <dialog id="dlg"><div class="dlg-h"><b id="dlgTitle"></b><button class="x" id="dlgClose" aria-label="Close">×</button></div><div id="dlgBody" class="md"></div></dialog>
 <script src="/app.js" type="module"></script>
+<script>if ('serviceWorker' in navigator && !navigator.userAgent.includes('Electron')) navigator.serviceWorker.register(new URL('../sw.js', location.href), { scope: new URL('../', location.href).pathname }).catch(() => {});</script>
 </body>
 </html>
