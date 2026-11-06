@@ -79,6 +79,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .chip{display:flex;align-items:center;gap:12px;height:62px;border:1px solid var(--line-2);border-radius:999px;padding:0 18px 0 10px}
 .chip .ico{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;background:#fff}
 .chip .ico svg{width:24px;height:24px}
+.chip .ico{overflow:hidden}.chip .mlogo{width:100%;height:100%;object-fit:cover;display:block}
+.tm-n{display:flex;align-items:center;gap:12px}.tm-n img,.tm-n svg{width:28px;height:28px;border-radius:50%;flex:none;object-fit:cover}.tm-n svg{border-radius:0;color:var(--ink)}
 .chip .nm{display:flex;flex-direction:column;line-height:1.15;margin-right:14px}
 .chip .nm b{font-weight:600;font-size:17px;letter-spacing:-.01em}
 .chip .nm span{font-size:13px;color:var(--mute-2)}
@@ -955,8 +957,8 @@ const ico = {
   paper:'<svg viewBox="0 0 24 24" fill="none" stroke="#010521" stroke-width="1.6"><rect x="4" y="4" width="16" height="16"/><path d="M8 15l3-4 2.5 2.5L17 9" /></svg>',
   plus:'<svg viewBox="0 0 24 24" stroke="#010521" stroke-width="1.6"><path d="M12 6v12M6 12h12"/></svg>'
 };
-const chips=[['note','Vault','Obsidian','LOCAL'],['md','Markdown','Plain notes','YOUR DISK'],['m:Op','Opus 5.5','Claude','LEAD'],['m:Fa','Fable 5.1','Claude','PSYCHOLOGY'],['m:So','Sonnet 5.5','Claude','SCRIBE'],['m:GP','GPT','OpenAI · latest','REVIEW'],['m:Ge','Gemini','Google · latest','CONTEXT'],['m:As','Astra','OpenAI','CHARTS'],['m:Gr','Grok','xAI · latest','SENTIMENT'],['guard','Brake','Rules, not a model','RISK'],['paper','Broker','Paper mode','PAPER'],['plus','Real money','After your marks','LAST']];
-const chipHTML = chips.map(([i,n,s,t])=>`<div class="chip${t==='LAST'?' planned':''}"><span class="ico">${i.startsWith('m:')?`<b class="mono" style="font-size:12px;font-weight:500">${i.slice(2)}</b>`:ico[i]}</span><span class="nm"><b>${n}</b><span>${s}</span></span><span class="tag">${t}</span></div>`).join('');
+const chips=[['note','Vault','Obsidian','LOCAL'],['md','Markdown','Plain notes','YOUR DISK'],['m:claude','Opus 5.5','Claude','LEAD'],['m:claude','Fable 5.1','Claude','PSYCHOLOGY'],['m:claude','Sonnet 5.5','Claude','SCRIBE'],['m:chatgpt','GPT','OpenAI · latest','REVIEW'],['m:gemini','Gemini','Google · latest','CONTEXT'],['m:chatgpt','Astra','OpenAI','CHARTS'],['m:grok','Grok','xAI · latest','SENTIMENT'],['guard','Brake','Rules, not a model','RISK'],['paper','Broker','Paper mode','PAPER'],['plus','Real money','After your marks','LAST']];
+const chipHTML = chips.map(([i,n,s,t])=>`<div class="chip${t==='LAST'?' planned':''}"><span class="ico">${i.startsWith('m:')?`<img class="mlogo" src="/assets/model-${i.slice(2)}.webp" alt="" width="42" height="42" loading="lazy">`:ico[i]}</span><span class="nm"><b>${n}</b><span>${s}</span></span><span class="tag">${t}</span></div>`).join('');
 $('#track').innerHTML = chipHTML + chipHTML;
 
 /* ---------- VAULT NOTES ---------- */
@@ -1081,15 +1083,15 @@ function steps(){
 steps(); if(!reduce) setInterval(()=>{cur=cur>=14?1:cur+1;steps()},2600);
 
 /* ---------- TEAM ---------- */
-const tm=(n,d,h,role)=>`<div class="ct lb"><b>${n}</b><span class="d">${d}</span><span class="m">${h}</span><span class="acts"><span class="st-chip">${role}</span></span></div>`;
+const tm=(n,d,h,role,logo)=>`<div class="ct lb"><b class="tm-n">${logo?`<img src="/assets/model-${logo}.webp" alt="" width="28" height="28" loading="lazy">`:'<svg aria-hidden="true"><use href="#mark"/></svg>'}<span>${n}</span></b><span class="d">${d}</span><span class="m">${h}</span><span class="acts"><span class="st-chip">${role}</span></span></div>`;
 $('#ct1').innerHTML=`<div class="ct-gh"><span>The team</span><span class="eyebrow">7 MODELS + RULES</span></div>`
- +tm('Claude Opus 5.5','Reads your whole vault, finds what wins and loses, writes the strategy notes','→ GPT reviews','LEAD ANALYST')
- +tm('Claude Fable 5.1','Reads your emotion and tilt notes, turns behaviour patterns into rules','→ Brake enforces','PSYCHOLOGY')
- +tm('Claude Sonnet 5.5','Turns every trade, yours or the team\'s, into a clean templated note','→ Opus reads','SCRIBE')
- +tm('GPT-6.1 Terra','Challenges every proposal before it is sent; no agreement, no trade','→ Opus revises','SECOND OPINION')
- +tm('Gemini Pro (latest)','Macro, news and earnings around your assets, summarised into the note','→ Opus weighs','CONTEXT')
- +tm('GPT-6 Astra','Reads the price candles and marks trend, support and resistance','→ Opus decides','CHARTS')
- +tm('Grok (latest)','Real-time social and news sentiment for the assets in play','→ GPT checks','SENTIMENT')
+ +tm('Claude Opus 5.5','Reads your whole vault, finds what wins and loses, writes the strategy notes','→ GPT reviews','LEAD ANALYST','claude')
+ +tm('Claude Fable 5.1','Reads your emotion and tilt notes, turns behaviour patterns into rules','→ Brake enforces','PSYCHOLOGY','claude')
+ +tm('Claude Sonnet 5.5','Turns every trade, yours or the team\'s, into a clean templated note','→ Opus reads','SCRIBE','claude')
+ +tm('GPT-6.1 Terra','Challenges every proposal before it is sent; no agreement, no trade','→ Opus revises','SECOND OPINION','chatgpt')
+ +tm('Gemini Pro (latest)','Macro, news and earnings around your assets, summarised into the note','→ Opus weighs','CONTEXT','gemini')
+ +tm('GPT-6 Astra','Reads the price candles and marks trend, support and resistance','→ Opus decides','CHARTS','chatgpt')
+ +tm('Grok (latest)','Real-time social and news sentiment for the assets in play','→ GPT checks','SENTIMENT','grok')
  +tm('Brake','Plain code, not a model: risk, drawdown, daily loss and hours','→ blocks or sends','RISK RULES');
 const row2=(n,d,a)=>`<div class="ct"><b>${n}</b><span class="d">${d}</span><span class="a">${a}</span><span class="acts"><button class="lk" data-copy="${a}">COPY</button></span></div>`;
 $('#ct2').innerHTML=`<div class="ct-gh"><span>Your stack</span><span class="eyebrow">4 PIECES</span></div>`

@@ -5,13 +5,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 export const MODELS = {
-  opus:   { label: 'Claude Opus 5.5',   id: 'anthropic/claude-opus-5.5' },
-  fable:  { label: 'Claude Fable 5.1',  id: 'anthropic/claude-fable-5.1' },
-  sonnet: { label: 'Claude Sonnet 5.5', id: 'anthropic/claude-sonnet-5.5' },
-  gpt:    { label: 'GPT-6.1 Terra',     id: 'openai/gpt-6.1-terra' },
-  astra:  { label: 'GPT-6 Astra',       id: 'openai/gpt-6-astra' },
-  gemini: { label: 'Gemini Pro (latest)', id: '~google/gemini-pro-latest' },
-  grok:   { label: 'Grok (latest)',     id: '~x-ai/grok-latest' },
+  opus:   { label: 'Claude Opus 5.5',   id: 'anthropic/claude-opus-5.5', logo: 'claude' },
+  fable:  { label: 'Claude Fable 5.1',  id: 'anthropic/claude-fable-5.1', logo: 'claude' },
+  sonnet: { label: 'Claude Sonnet 5.5', id: 'anthropic/claude-sonnet-5.5', logo: 'claude' },
+  gpt:    { label: 'GPT-6.1 Terra',     id: 'openai/gpt-6.1-terra', logo: 'chatgpt' },
+  astra:  { label: 'GPT-6 Astra',       id: 'openai/gpt-6-astra', logo: 'chatgpt' },
+  gemini: { label: 'Gemini Pro (latest)', id: '~google/gemini-pro-latest', logo: 'gemini' },
+  grok:   { label: 'Grok (latest)',     id: '~x-ai/grok-latest', logo: 'grok' },
 };
 
 export const ROLES = {
