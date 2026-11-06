@@ -95,11 +95,12 @@ $('#dlgClose').onclick = () => $('#dlg').close();
 function renderHeader() {
   document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === settings.mode));
   const k = $('#keyPill');
-  if (settings.hasApiKey) { k.className = 'keypill ok'; k.textContent = 'OpenRouter ' + settings.apiKeyHint; }
+  if (settings.hasApiKey) { k.className = 'keypill ok'; k.textContent = 'AI key ' + settings.apiKeyHint; }
   else if (settings.freeAvailable) { const left = Math.max(settings.freeLimit - settings.freeUsed, 0); k.className = 'keypill' + (left ? '' : ' warn'); k.textContent = `${left}/${settings.freeLimit} free left`; }
-  else { k.className = 'keypill warn'; k.textContent = 'Add API key'; }
+  else { k.className = 'keypill warn'; k.textContent = 'Connect AI'; }
 }
 $('#keyPill').onclick = () => go('team');
+$('#themeBtn').onclick = () => { const dark = document.documentElement.dataset.theme !== 'dark'; if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme; try { localStorage.setItem('kairos-theme', dark ? 'dark' : 'light'); } catch { /* private mode */ } };
 $('#modeSeg').onclick = async e => {
   const m = e.target.closest('button')?.dataset.mode; if (!m || m === settings.mode) return;
   try { settings = await api('/settings', { method: 'PUT', body: { mode: m } }); renderHeader(); toast(m === 'team' ? 'Team mode: models split roles and review each other' : 'Solo mode: one model does everything'); if (current === 'team') render(); }
@@ -122,7 +123,7 @@ const views = {
       <div class="head"><div><h1>Overview</h1><p>${settings.web ? `Vault: ${esc(settings.vaultLabel)}.` : `Vault: <span class="mono">${esc(s.vault)}</span> · open it in Obsidian as a vault.`}</p></div>
         <div class="row"><button class="btn" data-go="journal">Log a trade</button><button class="btn dark" data-go="ask">Ask the ${settings.mode === 'team' ? 'team' : 'model'}</button></div></div>
       ${settings.web ? `<div class="banner info">Web version: running strategies trade on paper while this tab is open. For 24/7 paper trading and real money on Kraken, use the <a href="../tour#get">desktop app</a>.</div>` : ''}
-      ${free ? `<div class="banner ${settings.freeAvailable ? 'info' : ''}">${settings.freeAvailable ? `You have <b>${Math.max(settings.freeLimit - settings.freeUsed, 0)} of ${settings.freeLimit}</b> free instructions (Ask or Analyse). After that, and for paper trading, add your own OpenRouter API key in <a href="#team">Team</a>.` : `Add your OpenRouter API key in <a href="#team">Team</a> to use the models. Journaling works without it.`}</div>` : ''}
+      ${free ? `<div class="banner ${settings.freeAvailable ? 'info' : ''}">${settings.freeAvailable ? `You have <b>${Math.max(settings.freeLimit - settings.freeUsed, 0)} of ${settings.freeLimit}</b> free instructions (Ask or Analyse). After that, and for paper trading, add your own AI key in <a href="#team">Team</a>.` : `Connect your AI key in <a href="#team">Team</a> to use the models. Journaling works without it.`}</div>` : ''}
       ${views.examplesBanner(s.examples)}
       <div class="grid g4">
         <div class="card stat"><span class="eyebrow">Journal trades</span><div class="n">${s.journalCount}</div></div>
@@ -178,7 +179,7 @@ const views = {
     const shown = trades.slice().reverse().filter(t => filt === 'all' || (filt === 'wins' ? t.pnl > 0 : filt === 'losses' ? t.pnl < 0 : !!t.image));
     view.innerHTML = `
       <div class="head"><div><h1>Journal</h1><p>Every trade is a note in <span class="mono">Trades/</span> with its screenshot in <span class="mono">Attachments/</span>. Obsidian shows both; Analyse lets the models look at your charts.</p></div>
-        <button class="btn dark" id="newTrade">${trades.length ? 'Log a trade' : 'Log your first trade'}</button></div>
+        <div class="row">${trades.length ? '<button class="btn" id="sharePnl">Share PnL ↗</button>' : ''}<button class="btn dark" id="newTrade">${trades.length ? 'Log a trade' : 'Log your first trade'}</button></div></div>
       ${views.examplesBanner(trades.filter(t => t.tags.includes('example')).length)}
       <div class="jstats">
         <div class="jcurve card"><div class="row" style="justify-content:space-between"><span class="eyebrow">Cumulative PnL</span><span class="num ${cls(acc)}">${money(acc)}</span></div>
@@ -192,6 +193,7 @@ const views = {
           <div class="card stat"><span class="eyebrow">Avg R</span><div class="n ${cls(rs.length ? sum(rs, r => r) : 0)}">${rs.length ? (sum(rs, r => r) / rs.length).toFixed(2) : '–'}</div></div>
         </div>
       </div>
+      ${trades.length ? pnlCalendar(trades, views.journal.month) : ''}
       <form class="card soft jform" id="tradeForm" ${trades.length ? 'hidden' : ''}>
         <label class="drop" id="drop" tabindex="0"><input type="file" accept="image/*" id="shot" hidden>
           <div class="drop-empty"><b>Chart screenshot</b><span>Paste (Ctrl/⌘ V), drop an image here, or click to choose</span></div>
@@ -234,6 +236,8 @@ const views = {
     f.date.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     $('#newTrade').onclick = () => { f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); f.asset.focus(); };
     $('#cancelTrade').onclick = () => { f.hidden = true; };
+    view.querySelectorAll('[data-month]').forEach(b => (b.onclick = () => { views.journal.month = b.dataset.month; render(); }));
+    if ($('#sharePnl')) $('#sharePnl').onclick = () => openShare(trades, views.journal.month);
     if ($('#jfilter')) $('#jfilter').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { views.journal.filter = b.dataset.f; render(); } };
     // screenshot: click, drop or paste; compressed in the browser before upload
     let shot = null;
@@ -451,14 +455,15 @@ const views = {
   async team() {
     const c = settings, M = c.catalog.models, R = c.catalog.roles;
     const opts = sel => Object.entries(M).map(([k, m]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(m.label)}</option>`).join('');
-    view.innerHTML = `<div class="head"><div><h1>Team settings</h1><p>All models go through OpenRouter with one key. Choose whether they work as a team or one model works alone.</p></div></div>
+    view.innerHTML = `<div class="head"><div><h1>Team settings</h1><p>One key connects every model. Choose whether they work as a team or one model works alone.</p></div></div>
       <div class="grid g2">
         <div class="card"><h2>How the models work</h2>
           <div class="row" style="margin:14px 0"><label class="check"><input type="radio" name="mode" value="team" ${c.mode === 'team' ? 'checked' : ''}> <b>Team</b>: each model takes a role and a second model reviews every trade</label></div>
           <div class="row"><label class="check"><input type="radio" name="mode" value="solo" ${c.mode === 'solo' ? 'checked' : ''}> <b>Solo</b>: one model does everything</label><span class="mpick"><img class="mlogo" src="../assets/model-${esc(M[c.soloModel]?.logo || 'claude')}.webp" alt="" width="24" height="24"><select id="soloModel" style="width:auto">${opts(c.soloModel)}</select></span></div>
-          <label class="check" style="margin-top:16px"><input type="checkbox" id="web" ${c.webSearch ? 'checked' : ''}> Allow web search for Market context and Sentiment (extra OpenRouter cost)</label>
+          <label class="check" style="margin-top:16px"><input type="checkbox" id="web" ${c.webSearch ? 'checked' : ''}> Allow web search for Market context and Sentiment (extra model cost)</label>
         </div>
-        <div class="card"><h2>OpenRouter API key</h2><p class="sub" style="margin:8px 0 12px">${c.hasApiKey ? `Saved (${esc(c.apiKeyHint)}). Stored only on this computer in <span class="mono">~/.kairos/config.json</span>, never in the vault.` : c.freeAvailable ? `You are on the free trial: ${Math.max(c.freeLimit - c.freeUsed, 0)} of ${c.freeLimit} instructions left. Paper trading needs your own key.` : 'Needed to use the models. Get one at openrouter.ai/keys.'}</p>
+        <div class="card"><h2>AI key</h2><p class="sub" style="margin:8px 0 12px">${c.hasApiKey ? `Saved (${esc(c.apiKeyHint)}). Stored only on this computer in <span class="mono">~/.kairos/config.json</span>, never in the vault.` : c.freeAvailable ? `You are on the free trial: ${Math.max(c.freeLimit - c.freeUsed, 0)} of ${c.freeLimit} instructions left. Paper trading needs your own key.` : 'Needed to use the models.'}</p>
+          <p class="sub" style="margin:-4px 0 12px">Kairos connects to every model through <b>OpenRouter</b>, so one key covers Claude, GPT, Gemini, Astra and Grok. Get yours at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a> and paste it here.</p>
           <div class="row"><input id="key" type="password" placeholder="sk-or-..." autocomplete="off" style="flex:1"><button class="btn dark" id="saveKey">Save key</button>${c.hasApiKey ? '<button class="btn red" id="delKey">Remove</button>' : ''}</div>
           ${c.web ? `<p class="sub" style="margin-top:16px">Vault: <b>${esc(c.vaultLabel)}</b></p><div class="row" style="margin-top:8px"><button class="btn sm" id="zipVault">Export vault (.zip)</button><button class="btn sm" id="switchVault">Use another place</button></div>`
             : `<label style="margin-top:16px">Vault folder<input id="vault" value="${esc(c.vaultPath)}"></label><button class="btn sm" id="saveVault" style="margin-top:8px">Change vault</button>`}</div>
@@ -469,7 +474,7 @@ const views = {
       <div class="card" style="margin-top:16px"><h2>Roles</h2><p class="sub" style="margin:6px 0 12px">Used in Team mode. Lead is always on. Brake (risk) is code, not a model.</p>
         <div class="tblwrap"><table><tr><th>On</th><th>Role</th><th>What it does</th><th>Model</th></tr>
         ${Object.entries(R).map(([k, r]) => `<tr><td><input type="checkbox" data-role-on="${k}" ${c.enabledRoles[k] ? 'checked' : ''} ${k === 'lead' ? 'disabled' : ''} style="width:auto"></td><td><b>${esc(r.label)}</b></td><td class="sub">${esc(r.desc)}</td><td><span class="mpick"><img class="mlogo" src="../assets/model-${esc(M[c.roles[k]]?.logo || 'claude')}.webp" alt="" width="24" height="24"><select data-role="${k}">${opts(c.roles[k])}</select></span></td></tr>`).join('')}</table></div></div>
-      <details class="card soft" style="margin-top:16px"><summary style="cursor:pointer;font-weight:600">OpenRouter model IDs</summary><div class="form" style="margin-top:12px">
+      <details class="card soft" style="margin-top:16px"><summary style="cursor:pointer;font-weight:600">Advanced: model IDs</summary><div class="form" style="margin-top:12px">
         ${Object.entries(M).map(([k, m]) => `<label>${esc(m.label)}<input data-model="${k}" value="${esc(c.models[k])}" class="mono"></label>`).join('')}</div>
         <button class="btn sm" id="saveIds" style="margin-top:12px">Save model IDs</button></details>`;
     const save = async (patch, msg) => { try { settings = await api('/settings', { method: 'PUT', body: patch }); renderHeader(); toast(msg); render(); } catch (e) { fail(e); } };
@@ -600,6 +605,109 @@ document.addEventListener('click', e => {
   const st = e.target.closest('[data-strat]'); if (st) { selected = st.dataset.strat; go('strategies'); }
 });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (views[v] && v !== current) { current = v; render(); } });
+
+/* ---------- PnL calendar ---------- */
+function pnlCalendar(trades, month){
+  const months = [...new Set(trades.map(t => String(t.date).slice(0, 7)))].sort();
+  const m = months.includes(month) ? month : months.at(-1), i = months.indexOf(m);
+  const [y, mo] = m.split('-').map(Number), first = new Date(Date.UTC(y, mo - 1, 1)), days = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  const byDay = {}; for (const t of trades) { const d = String(t.date).slice(0, 10); if (d.startsWith(m)) { const x = byDay[d] ||= { pnl: 0, n: 0 }; x.pnl += t.pnl; x.n++; } }
+  const vals = Object.values(byDay), maxAbs = Math.max(1, ...vals.map(v => Math.abs(v.pnl))), tot = vals.reduce((a, v) => a + v.pnl, 0), n = vals.reduce((a, v) => a + v.n, 0);
+  const lead = (first.getUTCDay() + 6) % 7, cells = [];
+  for (let k = 0; k < lead; k++) cells.push('<div class="cd empty"></div>');
+  for (let d = 1; d <= days; d++) {
+    const key = `${m}-${String(d).padStart(2, '0')}`, v = byDay[key], a = v ? .18 + .62 * Math.min(1, Math.abs(v.pnl) / maxAbs) : 0;
+    cells.push(`<div class="cd ${v ? (v.pnl >= 0 ? 'up' : 'dn') : ''}" style="${v ? `--a:${a.toFixed(2)}` : ''}"><span class="dn-n">${d}</span>${v ? `<b>${v.pnl >= 0 ? '+' : '−'}$${Math.abs(v.pnl) >= 1000 ? (Math.abs(v.pnl) / 1000).toFixed(1) + 'k' : Math.abs(v.pnl).toFixed(0)}</b><span class="cn">${v.n} trade${v.n > 1 ? 's' : ''}</span>` : ''}</div>`);
+  }
+  const label = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return `<section class="card pcal"><div class="pcal-h"><div><span class="eyebrow">PnL calendar</span><h2>${label}</h2></div>
+    <div class="pcal-sum"><span class="num ${cls(tot)}">${money(tot)}</span><span class="sub">${n} trade${n === 1 ? "" : "s"} · ${vals.length} trading day${vals.length === 1 ? "" : "s"}</span></div>
+    <div class="row"><button class="btn sm" ${i > 0 ? `data-month="${months[i - 1]}"` : 'disabled'} aria-label="Previous month">←</button><button class="btn sm" ${i < months.length - 1 ? `data-month="${months[i + 1]}"` : 'disabled'} aria-label="Next month">→</button></div></div>
+    <div class="pcal-g">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="cw">${d}</div>`).join('')}${cells.join('')}</div></section>`;
+}
+
+/* ---------- shareable PnL card: counts from 0 to the PnL; PNG or video; your own image or video behind ---------- */
+function openShare(trades, month){
+  const months = [...new Set(trades.map(t => String(t.date).slice(0, 7)))].sort();
+  const st = { period: 'all', unit: 'usd', bg: null, bgKind: null, rec: false };
+  $('#dlgTitle').textContent = 'Share your PnL';
+  $('#dlgBody').innerHTML = `<div class="share">
+    <canvas id="shareCv" width="1080" height="1350"></canvas>
+    <div class="share-c">
+      <label>Period<select id="shP"><option value="all">All time</option>${months.slice().reverse().map(m => `<option value="${m}" ${m === month ? '' : ''}>${new Date(m + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</option>`).join('')}</select></label>
+      <label>Show<select id="shU"><option value="usd">PnL in dollars</option><option value="r">PnL in R</option><option value="pct">Return in %</option></select></label>
+      <label>Background<select id="shB"><option value="kairos">Kairos pixels</option><option value="granite">Granite</option><option value="file">My image or video…</option></select></label>
+      <input type="file" id="shF" accept="image/*,video/*" hidden>
+      <p class="sub" id="shNote">The number counts up from $0. Export a still image, or a video of the count.</p>
+      <div class="row"><button class="btn dark" id="shPng">Download image</button><button class="btn" id="shVid">Record video</button></div>
+      <button class="btn sm" id="shReplay">Replay</button>
+    </div></div>`;
+  $('#dlg').showModal();
+  const cv = $('#shareCv'), ctx = cv.getContext('2d'), W = 1080, H = 1350;
+  const vb = document.querySelector('.brand svg')?.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, 32, 32];
+  const markD = document.querySelector('.brand svg path')?.getAttribute('d');
+  const data = () => { const ts = trades.filter(t => st.period === 'all' || String(t.date).startsWith(st.period)).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const pnl = ts.reduce((a, t) => a + t.pnl, 0), r = ts.reduce((a, t) => a + (+t.r || 0), 0), w = ts.filter(t => t.pnl > 0).length, gl = -ts.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0), gp = ts.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
+    let c = 0; const curve = [0, ...ts.map(t => (c += t.pnl))];
+    return { ts, pnl, r, pct: pnl / 10000 * 100, wins: w, n: ts.length, pf: gl > 0 ? gp / gl : null, curve }; };
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  function cover(src, w, h){ const sr = w / h, dr = W / H; let sw = w, sh = h, sx = 0, sy = 0; if (sr > dr) { sw = h * dr; sx = (w - sw) / 2; } else { sh = w / dr; sy = (h - sh) / 2; } ctx.drawImage(src, sx, sy, sw, sh, 0, 0, W, H); }
+  function bg(t){
+    if (st.bg) { const el = st.bg; if (st.bgKind === 'video') cover(el, el.videoWidth || 1, el.videoHeight || 1); else cover(el, el.naturalWidth, el.naturalHeight);
+      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(10,12,18,.45)'); g.addColorStop(.55, 'rgba(10,12,18,.55)'); g.addColorStop(1, 'rgba(10,12,18,.85)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); return; }
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#2b2e33'); g.addColorStop(1, '#1d1f23'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if ($('#shB').value === 'kairos') { const C = 30; for (let i = 0; i < W / C; i++) for (let j = 0; j < H / C; j++) { const u = i / (W / C), cy = (.3 - u * .16 + .05 * Math.sin(u * 8 + t * 2)) * H, d = Math.abs(j * C - cy) / (H * .1), n = Math.abs(Math.sin(i * 127.1 + j * 311.7) * 43758.5) % 1, v = 1 - d + (n - .5) * .6;
+      if (v > .55) { ctx.fillStyle = u > .5 ? '#0055ff' : '#1d3cb0'; ctx.fillRect(i * C + 4, j * C + 4, 20, 20); } else if (v > .3 && n > .45) { ctx.fillStyle = '#97e6ff'; ctx.fillRect(i * C + 9, j * C + 9, 10, 10); } else { ctx.fillStyle = 'rgba(151,230,255,.10)'; ctx.fillRect(i * C + 13, j * C + 13, 3, 3); } } }
+  }
+  function frame(p){ // p: 0..1 count progress
+    const d = data(), k = ease(Math.min(1, p)); bg(p);
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'alphabetic';
+    if (markD) { ctx.save(); ctx.translate(80, 86); ctx.scale(56 / vb[2], 56 / vb[3]); ctx.translate(-vb[0], -vb[1]); ctx.fill(new Path2D(markD), 'evenodd'); ctx.restore(); }
+    ctx.font = '600 46px Geist, system-ui, sans-serif'; ctx.fillText('kairos', 150, 130);
+    ctx.font = '500 26px "Geist Mono", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.fillText((st.period === 'all' ? 'ALL TIME' : new Date(st.period + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase()) + ' · PNL', W - 80, 126); ctx.textAlign = 'left';
+    const val = st.unit === 'usd' ? d.pnl : st.unit === 'r' ? d.r : d.pct, cur = val * k;
+    const txt = st.unit === 'usd' ? `${cur >= 0 ? '+' : '−'}$${Math.abs(cur).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : st.unit === 'r' ? `${cur >= 0 ? '+' : '−'}${Math.abs(cur).toFixed(2)}R` : `${cur >= 0 ? '+' : '−'}${Math.abs(cur).toFixed(2)}%`;
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '500 30px "Geist Mono", monospace'; ctx.fillText(st.unit === 'pct' ? 'RETURN' : 'PROFIT AND LOSS', 80, 640);
+    let fs = 190; ctx.font = `500 ${fs}px Geist, system-ui, sans-serif`; while (ctx.measureText(txt).width > W - 160 && fs > 80) { fs -= 8; ctx.font = `500 ${fs}px Geist, system-ui, sans-serif`; }
+    ctx.fillStyle = val >= 0 ? '#5ee39b' : '#ff6b57'; ctx.fillText(txt, 72, 640 + fs * .95);
+    // curve drawn as the number counts
+    const cx = 80, cy = 940, cw = W - 160, ch = 190, c = d.curve, lo = Math.min(...c), hi = Math.max(...c), span = hi - lo || 1, upto = Math.max(1, Math.round((c.length - 1) * k));
+    ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.setLineDash([6, 8]); ctx.beginPath(); const zy = cy + ch - (0 - lo) / span * ch; ctx.moveTo(cx, zy); ctx.lineTo(cx + cw, zy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = val >= 0 ? '#5ee39b' : '#ff6b57'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (let i = 0; i <= upto; i++) { const x = cx + (c.length > 1 ? i / (c.length - 1) : 0) * cw, y = cy + ch - (c[i] - lo) / span * ch; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    // stats
+    ctx.globalAlpha = Math.min(1, Math.max(0, (p - .55) / .3));
+    const stats = [['TRADES', String(d.n)], ['WIN RATE', d.n ? Math.round(d.wins / d.n * 100) + '%' : '—'], ['PROFIT FACTOR', d.pf == null ? '—' : d.pf.toFixed(2)]];
+    stats.forEach(([l, v], i) => { const x = 80 + i * 320; ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '500 24px "Geist Mono", monospace'; ctx.fillText(l, x, 1205); ctx.fillStyle = '#fff'; ctx.font = '500 58px Geist, system-ui, sans-serif'; ctx.fillText(v, x, 1270); });
+    ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '500 22px "Geist Mono", monospace'; ctx.fillText('@KairosELY · journal, paper first', 80, 1316);
+  }
+  let raf = 0, t0 = 0;
+  const play = (dur = 2400) => new Promise(done => { cancelAnimationFrame(raf); t0 = performance.now(); const tick = now => { const p = (now - t0 - 300) / dur; frame(Math.max(0, p)); if (p < 1.6) raf = requestAnimationFrame(tick); else { frame(1); done(); } }; raf = requestAnimationFrame(tick); });
+  const redraw = () => { cancelAnimationFrame(raf); frame(1); };
+  play();
+  $('#shP').onchange = e => { st.period = e.target.value; play(); };
+  $('#shU').onchange = e => { st.unit = e.target.value; play(); };
+  $('#shB').onchange = e => { if (e.target.value === 'file') { $('#shF').click(); return; } st.bg = null; st.bgKind = null; redraw(); };
+  $('#shF').onchange = e => { const f = e.target.files[0]; if (!f) return; const url = URL.createObjectURL(f);
+    if (f.type.startsWith('video/')) { const v = document.createElement('video'); v.src = url; v.muted = true; v.loop = true; v.playsInline = true; v.oncanplay = () => { st.bg = v; st.bgKind = 'video'; v.play(); play(); }; }
+    else { const im = new Image(); im.onload = () => { st.bg = im; st.bgKind = 'image'; play(); }; im.src = url; } };
+  $('#shReplay').onclick = () => play();
+  const save = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
+  $('#shPng').onclick = () => { frame(1); cv.toBlob(b => save(b, `kairos-pnl-${st.period}.png`), 'image/png'); };
+  $('#shVid').onclick = async e => {
+    if (!window.MediaRecorder || !cv.captureStream) return toast('This browser cannot record video. Try Chrome or Edge, or download the image.', true);
+    const type = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(x => MediaRecorder.isTypeSupported(x)) || '';
+    const rec = new MediaRecorder(cv.captureStream(30), type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined), chunks = [];
+    rec.ondataavailable = ev => ev.data.size && chunks.push(ev.data);
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Recording…';
+    rec.start(); await play(2600); await new Promise(r => setTimeout(r, 900)); rec.stop();
+    await new Promise(r => (rec.onstop = r));
+    btn.disabled = false; btn.textContent = 'Record video';
+    save(new Blob(chunks, { type: type.split(';')[0] || 'video/webm' }), `kairos-pnl-${st.period}.${type.includes('mp4') ? 'mp4' : 'webm'}`);
+  };
+  $('#dlg').addEventListener('close', () => cancelAnimationFrame(raf), { once: true });
+}
 
 let newsSeen = null;
 async function watchNews() {

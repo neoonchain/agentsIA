@@ -293,6 +293,23 @@ export function listNotes(root, dir) {
   return out.sort();
 }
 
+/** Every name a [[link]] or ![[embed]] can resolve to in this vault (Obsidian matches by file name or path). */
+export function vaultNames(root) {
+  const names = new Set();
+  const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (e.name.startsWith('.')) continue; const f = path.join(d, e.name);
+    if (e.isDirectory()) walk(f); else { const rel = path.relative(root, f).split(path.sep).join('/'); for (const n of [e.name, rel]) { names.add(n.toLowerCase()); names.add(n.replace(/\.md$/, '').toLowerCase()); } } } };
+  walk(root); return names;
+}
+/** Model-written text: links to notes that do not exist become plain text, so Obsidian shows no broken links. */
+export function unlinkMissing(root, text, extra = []) {
+  if (!String(text).includes('[[')) return text;
+  const names = vaultNames(root); for (const n of extra) { names.add(n.toLowerCase()); names.add(n.replace(/\.md$/, '').toLowerCase()); }
+  return String(text).replace(/(!?)\[\[([^\]|#]+)((?:#[^\]|]*)?)(?:\|([^\]]*))?\]\]/g, (all, bang, target, head, alias) => {
+    const t = target.trim().toLowerCase(), base = t.split('/').pop();
+    return names.has(t) || names.has(base) ? all : (alias || target).trim();
+  });
+}
+
 /** File-name safe slug that keeps the note readable in Obsidian. */
 export function safeName(s) {
   return String(s).replace(/[\\/:*?"<>|#^\[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'note';

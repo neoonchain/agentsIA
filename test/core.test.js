@@ -189,6 +189,7 @@ test('analyse writes an insight and a clamped draft strategy that cannot start',
 
 test('team decision: opens a paper trade with a note when the reviewer agrees', async () => {
   const app = freshApp('team'); app.setConfig(updateConfig(app.config, { apiKey: 'k' })); mock();
+  V.writeNote(app.vault, 'Trades/2026-11-03 BTC long.md', { asset: 'BTC-USD', side: 'long' }, 'A past trade the model links to.\n');
   app.start('Range breakout');
   const r = await app.decide('Range breakout');
   assert.equal(r.verdict.ok, true, r.verdict.reasons.join());
@@ -196,7 +197,8 @@ test('team decision: opens a paper trade with a note when the reviewer agrees', 
   const pos = app.account('Range breakout').positions['BTC-USD'];
   assert.ok(pos);
   const note = V.readNote(app.vault, pos.notePath);
-  assert.equal(note.data.status, 'open'); assert.match(note.body, /\[\[2026-11-03 BTC long\]\]/);
+  assert.equal(note.data.status, 'open'); assert.match(note.body, /\[\[2026-11-03 BTC long\]\]/); // links to notes that exist stay links
+  assert.equal(V.unlinkMissing(app.vault, 'See [[2026-11-03 BTC long]], [[Invented note|that day]] and ![[missing.png]]'), 'See [[2026-11-03 BTC long]], that day and missing.png');
   assert.match(note.body, /Clean scribe thesis/);
   // price hits the stop on the next tick → closed, note updated
   setMockMarket({ prices: { 'BTC-USD': 94, 'ETH-USD': 50, 'SOL-USD': 20 }, candles: [] });

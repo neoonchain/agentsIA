@@ -7,7 +7,7 @@ on:
   push:
     branches: ['**']
     tags: ['v*']
-    paths: ['desktop/**', 'src/**', 'index.html', '.github/workflows/desktop.yml']
+    paths: ['desktop/**', 'src/**', 'index.html', 'tour.html', 'assets/**', 'manifest.webmanifest', 'sw.js', '.github/workflows/desktop.yml']
   workflow_dispatch:
 
 permissions:

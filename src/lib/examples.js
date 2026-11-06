@@ -38,10 +38,10 @@ const isExample = t => (t.tags || []).includes(EXAMPLE_TAG);
 
 /** Paper test 6's trades as journal entries, with a factual note for each. */
 export function run6Trades() {
-  return RUN6.map(([asset, opened, entry, stop, target, exit, qty, pnl, r, reason, closed]) => {
+  return RUN6.map(([asset, opened, entry, stop, target, exit, qty, pnl, r, reason, closed], k) => {
     const hours = Math.round((Date.parse(closed + 'Z') - Date.parse(opened + 'Z')) / 3600000), win = pnl > 0;
     return {
-      date: opened, asset, side: 'long', entry, stop, exit, size: qty, pnl, r, strategy: 'Range breakout',
+      date: opened, asset, side: 'long', entry, stop, exit, size: qty, pnl, r, strategy: 'Range breakout', chart: `ex6-${String(k + 1).padStart(2, '0')}.webp`,
       emotion: 'rules-based', tags: `example, paper-test-6, breakout, ${reason.replace(/\s+/g, '-')}`,
       thesis: `Paper test 6, run by Kairos's rules on the app engine (a year no rule was tuned on). ${asset} closed above a 2-day range on 1.5x volume with the daily trend up; a buy limit waited for the retest of the range top and filled at ${entry}. Stop ${stop} at structure, target ${target} (2.5R).`,
       psychology: 'No discretion: the rules entered, sized at 1% risk and exited. Brake checked every order.',
@@ -90,7 +90,7 @@ export async function attachExampleCharts(root) {
   let n = 0;
   for (const t of V.listJournal(root).filter(isExample)) {
     if (t.image) continue;
-    const ex = EXAMPLES.find(e => e.asset === t.asset && e.date.replace('T', ' ') === t.date.slice(0, 16));
+    const ex = [...EXAMPLES, ...run6Trades()].find(e => e.asset === t.asset && e.date.replace('T', ' ') === t.date.slice(0, 16));
     if (!ex || !ex.chart) continue;
     const base = t.path.split('/').pop().replace(/\.md$/, ''), rel = `Attachments/${base}.webp`;
     fs.writeFileSync(V.resolveInVault(root, rel), await loadChart(ex.chart));

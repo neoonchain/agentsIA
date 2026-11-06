@@ -58,6 +58,8 @@ export class App {
     V.appendLog(this.vault, msg);
   }
   rules() { return V.readNote(this.vault, 'rules.md').data; }
+  /** Notes whose text comes from a model: links to notes that do not exist are turned into plain text. */
+  writeModelNote(rel, data, body) { return V.writeNote(this.vault, rel, data, V.unlinkMissing(this.vault, body, [rel])); }
 
   strategies() {
     return V.listNotes(this.vault, 'Strategies').map(p => {
@@ -148,7 +150,7 @@ export class App {
       data = { title, created: now, mode: this.config.mode, tags: ['chat'] }; body = `# ${title}\n\n`;
     }
     body += `## You · ${now}\n${q}\n\n## Kairos (${model}) · ${now}\n${answer}\n`;
-    V.writeNote(this.vault, rel, { ...data, updated: now }, body);
+    this.writeModelNote(rel, { ...data, updated: now }, body);
     return rel;
   }
 
@@ -208,7 +210,7 @@ export class App {
       const day = new Date().toISOString().slice(0, 10);
       const list = a => (Array.isArray(a) && a.length ? a.map(x => `- ${x}`).join('\n') : '- (none)');
       const insight = V.uniquePath(this.vault, `Insights/${day} ${this.config.mode === 'team' ? 'Team' : 'Solo'} analysis.md`);
-      V.writeNote(this.vault, insight, { date: day, mode: this.config.mode, models: [...new Set(steps.map(s => s.model))], tags: ['insight'] },
+      this.writeModelNote(insight, { date: day, mode: this.config.mode, models: [...new Set(steps.map(s => s.model))], tags: ['insight'] },
         `# Journal analysis\n\n${lead.summary || ''}\n\n## Strengths\n${list(lead.strengths)}\n\n## Weaknesses\n${list(lead.weaknesses)}\n\n## Psychology patterns\n${list(psych.patterns)}\n\n## Suggested rules\n${list(psych.rules)}\n` +
         (review ? `\n## Second opinion (${steps.find(s => s.role === 'reviewer')?.model})\n${review.agree ? 'Agrees.' : 'Disagrees.'}\n${list(review.issues)}\n` : ''));
       let strategyPath = null;
@@ -217,7 +219,7 @@ export class App {
         const assets = [].concat(s.assets || []).map(a => String(a).toUpperCase()).filter(validAsset);
         const maxRisk = Number(rules.max_risk_per_trade_pct) || 2;
         strategyPath = V.uniquePath(this.vault, `Strategies/${V.safeName(s.name)} (draft).md`);
-        V.writeNote(this.vault, strategyPath, {
+        this.writeModelNote(strategyPath, {
           name: `${V.safeName(s.name)} (draft)`, status: 'stopped', draft: true, assets: assets.length ? assets : ['BTC-USD'], timeframe: '1h',
           risk_per_trade_pct: Math.min(Math.max(Number(s.risk_per_trade_pct) || 1, 0.1), maxRisk),
           hours_utc: /^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(s.hours_utc || '') ? s.hours_utc : '00:00-23:59', interval_min: 60,
@@ -337,7 +339,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
 
   writeTradeNote(s, pos, p, reviewReason, steps, exit = null) {
     const links = [].concat(p?.links || []).map(l => `- [[${String(l).replace(/[\[\]]/g, '')}]]`).join('\n');
-    V.writeNote(this.vault, pos.notePath, {
+    this.writeModelNote(pos.notePath, {
       date: pos.openedAt.slice(0, 16).replace('T', ' '), asset: pos.asset, side: pos.side, entry: px(pos.entry), stop: pos.stop,
       take_profit: pos.takeProfit, size: px(pos.qty), exit: exit ? px(exit.exit) : null, pnl: exit ? exit.pnl : null, r: exit ? exit.r : null,
       status: exit ? 'closed' : 'open', strategy: s.name, account: pos.mode ? `kraken-${pos.mode}` : 'paper', kraken_entry: pos.entryTxid || undefined, kraken_stop: pos.stopTxid || undefined, proposer: pos.proposer, reviewer: pos.reviewer, tags: ['agent', 'paper'],
@@ -351,7 +353,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     if (t.notePath) {
       try {
         const n = V.readNote(this.vault, t.notePath);
-        V.writeNote(this.vault, t.notePath, { ...n.data, exit: px(t.exit), pnl: t.pnl, r: t.r, status: 'closed' },
+        this.writeModelNote(t.notePath, { ...n.data, exit: px(t.exit), pnl: t.pnl, r: t.r, status: 'closed' },
           n.body + `\n## Result\nClosed by ${t.reason} at ${px(t.exit)}: ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R).\n`);
       } catch { /* note was moved or deleted by the user */ }
     }
@@ -444,7 +446,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     let cur; try { cur = V.readNote(this.vault, rel); } catch { cur = { data: { strategy: s.name, tags: ['lessons'] }, body: `# Lessons · ${s.name}\n\nWritten automatically after every closed trade. The agents read the latest ones before each decision.\n` }; }
     const title = `${String(t.closedAt).slice(0, 10)} ${t.asset} ${t.side} · ${t.r >= 0 ? '+' : ''}${t.r}R · ${t.reason}`;
     const entry = `\n## ${title}\n- Result: ${t.pnl >= 0 ? '+' : ''}${t.pnl} USD (${t.r}R), held ${f.hours.toFixed(1)}h, best +${f.mfe}R / worst ${f.mae}R, fees ${(t.fees || 0).toFixed(2)} USD.\n${t.thesis ? `- Thesis: ${String(t.thesis).replace(/\n+/g, ' ').slice(0, 300)}\n` : ''}${f.out.map(x => `- Lesson: ${x}`).join('\n')}\n`;
-    V.writeNote(this.vault, rel, cur.data, cur.body.trimEnd() + '\n' + entry);
+    this.writeModelNote(rel, cur.data, cur.body.trimEnd() + '\n' + entry);
     const p = this.reflect(s, t, title, f).catch(() => {});
     (this.pendingLessons ||= new Set()).add(p); p.finally(() => this.pendingLessons.delete(p));
   }
@@ -462,7 +464,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       if (at < 0) return;
       const end = cur.body.indexOf('\n## ', at + 3);
       const body = end < 0 ? cur.body.trimEnd() + '\n' + add : cur.body.slice(0, end).trimEnd() + '\n' + add + cur.body.slice(end);
-      V.writeNote(this.vault, rel, cur.data, body);
+      this.writeModelNote(rel, cur.data, body);
     } finally { await closeInstruction(this.config, ins); }
   }
   /** The latest lesson entries, as text for prompts and as items for the UI. */
@@ -515,7 +517,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   start(name) {
-    if (!this.config.apiKey) throw Object.assign(new Error('Paper trading runs on its own schedule, so it needs your own OpenRouter API key (Team settings).'), { status: 402, code: 'NEED_KEY' });
+    if (!this.config.apiKey) throw Object.assign(new Error('Paper trading runs on its own schedule, so it needs your own AI key (Team settings).'), { status: 402, code: 'NEED_KEY' });
     const s = this.strategy(name);
     if (s.draft) throw Object.assign(new Error('This strategy is still a draft. Review it in Obsidian, set draft: false, then start it.'), { status: 400 });
     this.account(name); this.setStrategyStatus(name, 'running'); this.save();
@@ -553,7 +555,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     const s = this.strategy(name), promo = this.state.promotions[name];
     if (promo?.status !== 'approved') throw Object.assign(new Error('Approve the promotion first'), { status: 400 });
     if (!this.config.kraken) throw Object.assign(new Error('Connect a Kraken key in Team settings first'), { status: 400, code: 'NEED_EXCHANGE' });
-    if (!this.config.apiKey) throw Object.assign(new Error('Live trading needs your own OpenRouter API key'), { status: 402, code: 'NEED_KEY' });
+    if (!this.config.apiKey) throw Object.assign(new Error('Live trading needs your own AI key (Team settings)'), { status: 402, code: 'NEED_KEY' });
     if (mode !== 'validate' && mode !== 'real') throw Object.assign(new Error('Mode must be validate or real'), { status: 400 });
     if (this.liveOf(name)?.mode === mode) throw Object.assign(new Error(`Already live in ${mode} mode`), { status: 400 });
     if (this.liveOf(name) && Object.keys(this.liveOf(name).account.positions).length) throw Object.assign(new Error('Close the open live positions before switching mode'), { status: 400 });

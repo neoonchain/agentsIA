@@ -17,14 +17,14 @@ export function setMockLLM(fn) { mockFn = fn; }
 export async function openInstruction(config, kind) {
   if (config.apiKey) return { key: config.apiKey, free: false, kind, calls: 0 };
   const proxy = freeProxyUrl(config);
-  if (!proxy) throw new NeedKeyError('Add your OpenRouter API key in Team settings to use the models.');
-  if (kind === 'trade') throw new NeedKeyError('Paper trading runs on its own schedule, so it needs your own OpenRouter API key.');
+  if (!proxy) throw new NeedKeyError('Connect your AI key in Team settings to use the models.');
+  if (kind === 'trade') throw new NeedKeyError('Paper trading runs on its own schedule, so it needs your own AI key (Team settings).');
   if (mockFn) return { free: true, kind, calls: 0, mock: true };
   let r, j;
   try {
     r = await fetch(`${proxy}/v1/free/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ installId: config.installId, kind }), signal: AbortSignal.timeout(15000) });
     j = await r.json().catch(() => ({}));
-  } catch (e) { throw new Error(`The free trial server is unreachable (${e.message}). Add your own OpenRouter key to keep going.`); }
+  } catch (e) { throw new Error(`The free trial server is unreachable (${e.message}). Add your own AI key in Team to keep going.`); }
   if (r.status === 429 || r.status === 503) { config.freeRemaining = r.status === 429 ? 0 : config.freeRemaining; saveConfig(config); throw new NeedKeyError(j.error || 'Free trial used up.'); }
   if (!r.ok || !j.ticket) throw new Error(`Free trial: ${j.error || 'HTTP ' + r.status}`);
   return { proxy, ticket: j.ticket, free: true, kind, calls: 0 };
@@ -51,13 +51,13 @@ export async function chat(ins, { modelId, system, user, task, role, maxTokens =
       headers: { Authorization: `Bearer ${ins.key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/neoonchain/agentsIA', 'X-Title': 'Kairos' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(120000),
     });
-  } catch (e) { ins.calls--; throw new Error(`Could not reach OpenRouter: ${e.message}`); }
+  } catch (e) { ins.calls--; throw new Error(`Could not reach the models: ${e.message}`); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) {
     ins.calls--;
     const msg = j.error?.message || `HTTP ${r.status}`;
-    if (r.status === 401) throw new NeedKeyError(`OpenRouter rejected the API key (${msg}).`);
-    if (r.status === 402) throw new NeedKeyError(`OpenRouter: not enough credits (${msg}).`);
+    if (r.status === 401) throw new NeedKeyError(`The model provider rejected your AI key (${msg}).`);
+    if (r.status === 402) throw new NeedKeyError(`Your AI key has run out of credits (${msg}).`);
     throw new Error(`${modelId}: ${msg}`);
   }
   const text = j.choices?.[0]?.message?.content;
