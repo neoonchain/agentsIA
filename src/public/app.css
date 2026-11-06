@@ -194,3 +194,10 @@ a.nitem[href]:hover{background:var(--sky-soft)}
 .wc{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .coin{width:18px;height:18px;border-radius:50%;object-fit:cover;flex:none}
 .jph .coin{width:56px;height:56px;box-shadow:0 6px 20px rgba(0,10,40,.12)}
+
+/* examples + latest trades */
+.ex-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.lt{display:grid}
+.lt-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.lt-row:last-child{border-bottom:0}
+.lt-a{display:flex;align-items:center;gap:8px}

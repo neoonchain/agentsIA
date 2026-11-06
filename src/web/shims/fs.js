@@ -32,6 +32,7 @@ export function renameSync(a, b) {
   addDirs(parent(b)); files.set(b, files.get(a)); files.delete(a);
   changed(b, 'write'); changed(a, 'delete');
 }
+export function unlinkSync(p) { p = norm(p); if (!files.has(p)) throw enoent(p); files.delete(p); changed(p, 'delete'); }
 export function readdirSync(p, opts = {}) {
   p = norm(p); if (!dirs.has(p)) throw enoent(p);
   const pre = p === '/' ? '/' : p + '/', names = new Map();
@@ -137,4 +138,4 @@ export function dirBackend(root) {
   };
 }
 
-export default { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync };
+export default { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, renameSync, readdirSync, unlinkSync };

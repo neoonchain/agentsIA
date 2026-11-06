@@ -5,6 +5,7 @@ import { updateConfig, publicConfig } from './config.js';
 import * as V from './vault.js';
 import * as T from './trading.js';
 import { getPrice } from './market.js';
+import { removeExamples } from './examples.js';
 
 export const err = (status, message, code) => Object.assign(new Error(message), { status, code });
 
@@ -19,13 +20,14 @@ export function createApi(app) {
         return { name: s.name, status: s.status, draft: !!s.draft, live: lv ? lv.mode : null, assets: s.assets, trades: acc.trades.length, open: Object.keys(acc.positions).length,
           pnl: ev.metrics.totalPnl, eligible: ev.eligible, paused: acc.paused, promotion: app.state.promotions[s.name]?.status || null };
       });
-      return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length,
+      return { vault: app.vault, mode: app.config.mode, journal: T.metrics(journal, Number(rules.starting_balance) || 10000), journalCount: journal.length, examples: journal.filter(t => t.tags.includes('example')).length, recent: journal.slice(-4).reverse(),
         strategies, activity: app.activity.slice(0, 30), config: publicConfig(app.config) };
     }],
     ['GET', /^\/api\/settings$/, async () => publicConfig(app.config)],
     ['PUT', /^\/api\/settings$/, async (_, b) => { app.setConfig(updateConfig(app.config, b)); return publicConfig(app.config); }],
     ['GET', /^\/api\/journal$/, async () => V.listJournal(app.vault)],
     ['POST', /^\/api\/journal$/, async (_, b) => ({ path: V.createJournalTrade(app.vault, b) })],
+    ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
     ['GET', /^\/api\/news$/, async () => ({ items: app.news.items.slice(0, 120), shocks: app.news.shocks.slice(0, 30), status: app.news.status, watch: app.watchedAssets(),
       guards: Object.fromEntries(Object.entries(app.shockUntil).filter(([, g]) => g.until > Date.now())) })],

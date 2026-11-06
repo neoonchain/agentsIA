@@ -1,3 +1,4 @@
+process.env.KAIROS_EXAMPLES = '0'; // tests start from an empty journal
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

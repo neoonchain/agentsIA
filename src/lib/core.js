@@ -8,6 +8,7 @@ import { getPrice, getCandles, candleSummary, validAsset } from './market.js';
 import { openInstruction, closeInstruction, chat, parseJSON } from './llm.js';
 import * as K from './kraken.js';
 import * as L from './live.js';
+import { seedExamples, removeExamples } from './examples.js';
 import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf } from './news.js';
 import { getCandles1m } from './market.js';
 const px = L.fmtPx;
@@ -34,6 +35,7 @@ export class App {
     this.stateFile = path.join(this.vault, '.kairos', 'state.json');
     try { this.state = JSON.parse(fs.readFileSync(this.stateFile, 'utf8')); } catch { this.state = {}; }
     this.state.accounts ||= {}; this.state.promotions ||= {}; this.state.live ||= {};
+    if (process.env.KAIROS_EXAMPLES !== '0' && seedExamples(this.vault, this.state)) this.save(); // empty vault: show the paper-test trades
   }
   save() {
     const tmp = this.stateFile + '.tmp';

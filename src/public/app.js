@@ -110,6 +110,11 @@ function go(v) { current = v; location.hash = v; render(true); }
 
 /* ---------- views ---------- */
 const views = {
+  /** Notice shown while the example trades are in the journal. */
+  examplesBanner(n) {
+    return n ? `<div class="banner info ex-banner"><span><b>${n} example trades</b> from Kairos's own paper tests are in your journal so you can see how it works. Log your first trade, or remove them.</span><button class="btn sm" id="rmExamples">Remove examples</button></div>` : '';
+  },
+
   async overview() {
     const s = await api('/status'); const j = s.journal;
     const free = !settings.hasApiKey;
@@ -118,6 +123,7 @@ const views = {
         <div class="row"><button class="btn" data-go="journal">Log a trade</button><button class="btn dark" data-go="ask">Ask the ${settings.mode === 'team' ? 'team' : 'model'}</button></div></div>
       ${settings.web ? `<div class="banner info">Web version: running strategies trade on paper while this tab is open. For 24/7 paper trading and real money on Kraken, use the <a href="/#get">desktop app</a>.</div>` : ''}
       ${free ? `<div class="banner ${settings.freeAvailable ? 'info' : ''}">${settings.freeAvailable ? `You have <b>${Math.max(settings.freeLimit - settings.freeUsed, 0)} of ${settings.freeLimit}</b> free instructions (Ask or Analyse). After that, and for paper trading, add your own OpenRouter API key in <a href="#team">Team</a>.` : `Add your OpenRouter API key in <a href="#team">Team</a> to use the models. Journaling works without it.`}</div>` : ''}
+      ${views.examplesBanner(s.examples)}
       <div class="grid g4">
         <div class="card stat"><span class="eyebrow">Journal trades</span><div class="n">${s.journalCount}</div></div>
         <div class="card stat"><span class="eyebrow">Win rate</span>${rateCell(j.wins, j.losses)}</div>
@@ -128,8 +134,10 @@ const views = {
         <div class="card"><div class="head" style="margin-bottom:8px"><h2>Paper strategies</h2><button class="btn sm" data-go="strategies">Open</button></div>
           ${s.strategies.length ? `<table><tr><th>Strategy</th><th>Status</th><th>Trades</th><th>PnL</th><th>Marks</th></tr>${s.strategies.map(x => `<tr class="click" data-strat="${esc(x.name)}"><td>${esc(x.name)}</td><td>${chip(x)}</td><td class="num">${x.trades}${x.open ? ` (+${x.open} open)` : ''}</td><td class="num ${cls(x.pnl)}">${money(x.pnl)}</td><td>${x.eligible ? '<span class="chip ok">beaten</span>' : '<span class="chip">not yet</span>'}</td></tr>`).join('')}</table>` : '<p class="empty">No strategies yet.</p>'}
         </div>
-        <div class="card"><h2 style="margin-bottom:8px">Activity</h2><div class="feed">${s.activity.length ? s.activity.map(a => `<div><time>${ago(a.at)}</time><span>${md(a.msg).replace(/<\/?p>/g, '')}</span></div>`).join('') : '<p class="empty">Nothing yet this session. Full history is in the vault\'s Log folder.</p>'}</div></div>
-      </div>`;
+        <div class="card"><div class="head" style="margin-bottom:8px"><h2>Latest trades</h2><button class="btn sm" data-go="journal">Journal</button></div>
+          ${s.recent.length ? `<div class="lt">${s.recent.map(t => `<div class="lt-row click" data-note="${esc(t.path)}"><span class="lt-a">${withCoin(t.asset)} <span class="sub">${esc(t.side)} · ${esc(String(t.date).slice(0, 10))}</span></span><span class="num ${cls(t.pnl)}">${money(t.pnl)}${t.r != null ? ` · ${t.r > 0 ? '+' : ''}${t.r}R` : ''}</span></div>`).join('')}</div>` : '<p class="empty">No trades yet. Log your first one in the Journal.</p>'}</div>
+      </div>
+      ${s.activity.length ? `<div class="card" style="margin-top:16px">        <h2 style="margin-bottom:8px">Activity</h2><div class="feed">${s.activity.length ? s.activity.map(a => `<div><time>${ago(a.at)}</time><span>${md(a.msg).replace(/<\/?p>/g, '')}</span></div>`).join('') : '<p class="empty">Nothing yet this session. Full history is in the vault\'s Log folder.</p>'}</div></div>` : ''}`;
   },
 
   async journal() {
@@ -149,6 +157,7 @@ const views = {
     view.innerHTML = `
       <div class="head"><div><h1>Journal</h1><p>Every trade is a note in <span class="mono">Trades/</span> with its screenshot in <span class="mono">Attachments/</span>. Obsidian shows both; Analyse lets the models look at your charts.</p></div>
         <button class="btn dark" id="newTrade">${trades.length ? 'Log a trade' : 'Log your first trade'}</button></div>
+      ${views.examplesBanner(trades.filter(t => t.tags.includes('example')).length)}
       <div class="jstats">
         <div class="jcurve card"><div class="row" style="justify-content:space-between"><span class="eyebrow">Cumulative PnL</span><span class="num ${cls(acc)}">${money(acc)}</span></div>
           ${trades.length > 1 ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="jg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${acc >= 0 ? '#0055ff' : '#ef4423'}" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
@@ -460,6 +469,7 @@ function showDecision(r) {
 }
 
 document.addEventListener('click', e => {
+  const rx = e.target.closest('#rmExamples'); if (rx) { busy(rx, async () => { const r = await api('/examples/remove', { method: 'POST' }); toast(`Removed ${r.removed} example trades`); render(); }); return; }
   const n = e.target.closest('[data-note]'); if (n && n.dataset.note) { e.preventDefault(); openNote(n.dataset.note); return; }
   const g = e.target.closest('[data-go]'); if (g) { go(g.dataset.go); return; }
   const st = e.target.closest('[data-strat]'); if (st) { selected = st.dataset.strat; go('strategies'); }

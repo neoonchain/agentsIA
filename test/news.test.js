@@ -1,3 +1,4 @@
+process.env.KAIROS_EXAMPLES = '0'; // tests start from an empty journal
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -110,4 +111,19 @@ test('inbound webhook needs its token and feeds the hub', async () => {
     const settings = await (await fetch(`http://127.0.0.1:${port}/api/settings`)).json();
     assert.equal(settings.news.webhookToken, undefined); // never exposed in general settings
   } finally { server.close(); }
+});
+
+test('an empty vault gets the paper-test examples once; removing them is permanent', async () => {
+  const V = await import('../src/lib/vault.js');
+  process.env.KAIROS_VAULT = path.join(tmp, 'examples'); process.env.KAIROS_HOME = path.join(tmp, 'examples-home');
+  process.env.KAIROS_EXAMPLES = '1';
+  try {
+    const app = new App();
+    const j = V.listJournal(app.vault);
+    assert.equal(j.length, 3); assert.ok(j.every(t => t.tags.includes('example')));
+    assert.deepEqual(j.map(t => t.asset).sort(), ['BTC-USD', 'ETH-USD', 'SOL-USD']);
+    const { removeExamples } = await import('../src/lib/examples.js');
+    assert.equal(removeExamples(app.vault), 3); app.state.examples = 'removed'; app.save();
+    assert.equal(V.listJournal(new App().vault).length, 0); // reopening does not seed again
+  } finally { process.env.KAIROS_EXAMPLES = '0'; }
 });
