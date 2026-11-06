@@ -16,7 +16,7 @@
     "electron-builder": "^25.1.8"
   },
   "author": "Kairos",
-  "homepage": "https://github.com/neoonchain/agentsIA",
+  "homepage": "https://github.com/neoonchain/kairos",
   "build": {
     "appId": "io.kairos.desktop",
     "productName": "Kairos",
@@ -86,7 +86,7 @@
       {
         "provider": "github",
         "owner": "neoonchain",
-        "repo": "agentsIA",
+        "repo": "kairos",
         "releaseType": "release"
       }
     ]
