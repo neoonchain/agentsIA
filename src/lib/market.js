@@ -46,12 +46,12 @@ export async function getCandles(asset, limit = 48) {
   return v.slice(-limit);
 }
 
-/** Daily candles, oldest first (Coinbase, Kraken fallback). Used for the trend filter. */
-export async function getDailyCandles(asset, limit = 60) {
+/** Daily candles, oldest first (Coinbase, Kraken fallback). Used for the trend filter. `fresh` skips the cache. */
+export async function getDailyCandles(asset, limit = 60, { fresh = false } = {}) {
   if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
   if (mock) return (mock.daily?.[asset] || []).slice(-limit);
   const hit = cache.get('d:' + asset);
-  if (hit && Date.now() - hit.t < 15 * 60000) return hit.v.slice(-limit);
+  if (!fresh && hit && Date.now() - hit.t < 15 * 60000) return hit.v.slice(-limit);
   let v;
   try {
     const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=86400`);
@@ -59,6 +59,18 @@ export async function getDailyCandles(asset, limit = 60) {
   } catch { v = await K.ohlc(asset, 1440); }
   cache.set('d:' + asset, { t: Date.now(), v });
   return v.slice(-limit);
+}
+
+/** Daily candles from `start` (ms) to now, 300 per request (Coinbase only), for catching up after a long gap. */
+export async function getDailyRange(asset, start) {
+  if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
+  if (mock) return (mock.daily?.[asset] || []).filter(c => c.t >= start);
+  const rows = new Map(), D = 86400000, end = Date.now();
+  for (let t = start; t < end; t += 300 * D) {
+    const r = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=86400&start=${new Date(t).toISOString()}&end=${new Date(Math.min(end, t + 300 * D)).toISOString()}`);
+    for (const [ts, low, high, open, close, volume] of r) rows.set(ts * 1000, { t: ts * 1000, open, high, low, close, volume });
+  }
+  return [...rows.values()].sort((a, b) => a.t - b.t);
 }
 
 /** With the trend: price above its 20-day average, and the 20-day above the 50-day. null without enough data. */

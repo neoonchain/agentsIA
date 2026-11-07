@@ -182,7 +182,7 @@ test('analyse writes an insight and a clamped draft strategy that cannot start',
   const r = await app.analyse();
   assert.ok(fs.existsSync(path.join(app.vault, r.insight)));
   const s = V.readNote(app.vault, r.strategy).data;
-  assert.deepEqual(s.assets, ['BTC-USD']); assert.equal(s.risk_per_trade_pct, 2); assert.equal(s.draft, true);
+  assert.deepEqual(s.assets, ['BTC-USD']); assert.equal(s.risk_per_trade_pct, 3); // clamped to the rules' max_risk_per_trade_pct assert.equal(s.draft, true);
   assert.deepEqual([...new Set(calls.map(c => c.role))], ['lead', 'psychology', 'reviewer']);
   assert.throws(() => app.start(s.name), /draft/);
 });

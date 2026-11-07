@@ -6,9 +6,10 @@
 //   Exits:   close back above the 10-day average (with at least +0.5%), target 3 x ATR(14), stop 4 x ATR(14)
 //            (3% to 20%), or 10 days. Stop and target the same day count as the stop.
 //   Size:    1% of equity at risk, at most 25% of equity in one coin, at most 4 open at once.
-// Fees: entries, targets and average exits are limit orders (0.25%); stops and time stops pay 0.40% + 0.05% slippage.
+// Fees: limit entries and targets pay 0.25%; stops, exits at the close and time stops pay 0.40% + 0.05% slippage.
+// Each day: exits first, then yesterday's buy limits (a stop touched on the fill day counts), then new signals.
 export const DIP_ASSETS = ['BTC-USD', 'ETH-USD', 'SOL-USD', 'XRP-USD', 'DOGE-USD', 'ADA-USD', 'LINK-USD', 'LTC-USD'];
-export const DIP = { rsiN: 2, rsiMax: 15, trendN: 50, exitN: 10, btcN: 200, btcCrash: 0.10, atrN: 14, stopATR: 4, minStop: 0.03, maxStop: 0.2, targetATR: 3, minGain: 0.005, timeD: 10, risk: 0.01, maxAlloc: 0.25, maxOpen: 4, maker: 0.0025, taker: 0.004, slip: 0.0005 };
+export const DIP = { rsiN: 2, rsiMax: 15, trendN: 50, exitN: 10, btcN: 200, btcCrash: 0.10, atrN: 14, stopATR: 4, minStop: 0.03, maxStop: 0.2, targetATR: 3, minGain: 0.005, timeD: 10, risk: 0.03, maxAlloc: 0.25, maxOpen: 4, maker: 0.0025, taker: 0.004, slip: 0.0005 };
 export const DAY = 86400000;
 
 const sma = (a, n) => { const o = new Array(a.length).fill(NaN); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; };
@@ -44,37 +45,48 @@ export function stepTrack(state, daily, toT, onDay) {
     if (!(bi >= DIP.btcN)) { state.lastT = t; continue; }
     const btcUp = B.cl[bi] > B.long[bi], btc3d = B.cl[bi] / B.cl[bi - 3] - 1, regime = btcUp && btc3d > -DIP.btcCrash;
     const day = { t, btcVsAvg: B.cl[bi] / B.long[bi] - 1, btc3d, regime, signals: [], fills: [], exits: [], coins: {} };
+    const bars = {};
     for (const a of DIP_ASSETS) {
       const I = IND[a], i = I?.idx.get(t);
       if (i == null || i < 60 || I.c[i].t - I.c[i - 60].t > 62 * DAY) continue; // need 60 days without a gap
-      const bar = I.c[i], p = state.pos[a];
+      bars[a] = { I, i, bar: I.c[i] };
       day.coins[a] = { close: I.cl[i], up: I.cl[i] > I.trend[i], rsi: +I.rsi[i].toFixed(1) };
-      if (p) {
-        let exit = null, why;
-        if (bar.low <= p.stop) { exit = Math.min(p.stop, bar.open) * (1 - DIP.slip); why = 'stop'; }
-        else if (bar.high >= p.tp) { exit = Math.max(p.tp, bar.open); why = 'take profit'; }
-        else if (bar.close > I.exit[i] && bar.close > p.entry * (1 + DIP.minGain)) { exit = bar.close; why = 'back above the 10-day average'; }
-        else if (Math.round((t - p.t) / DAY) >= DIP.timeD) { exit = bar.close * (1 - DIP.slip); why = 'time stop'; }
-        if (exit) {
-          const taker = why === 'stop' || why === 'time stop';
-          const fees = p.qty * p.entry * DIP.maker + p.qty * exit * (taker ? DIP.taker : DIP.maker), pnl = p.qty * (exit - p.entry) - fees;
-          state.eq += pnl; state.peak = Math.max(state.peak, state.eq); state.maxDD = Math.max(state.maxDD, 1 - state.eq / state.peak);
-          const tr = { ...p, asset: a, closedT: t, exit, pnl, r: pnl / p.risk, why, fees, days: Math.round((t - p.t) / DAY) + 1 };
-          trades.push(tr); day.exits.push(tr); delete state.pos[a];
-        }
-        continue;
+    }
+    const exitAt = (a, p, exit, why) => {
+      const taker = why !== 'take profit'; // only the resting target is a limit order; stops, average exits (at the close) and time stops pay taker
+      const fees = p.qty * p.entry * DIP.maker + p.qty * exit * (taker ? DIP.taker : DIP.maker), pnl = p.qty * (exit - p.entry) - fees;
+      state.eq += pnl;
+      const tr = { ...p, asset: a, closedT: t, exit, pnl, r: pnl / p.risk, why, fees, days: Math.round((t - p.t) / DAY) + 1 };
+      trades.push(tr); day.exits.push(tr); delete state.pos[a];
+    };
+    // 1) exits of positions opened before today
+    for (const [a, p] of Object.entries(state.pos)) {
+      const b = bars[a]; if (!b) continue;
+      const { I, i, bar } = b;
+      if (bar.low <= p.stop) exitAt(a, p, Math.min(p.stop, bar.open) * (1 - DIP.slip), 'stop');
+      else if (bar.high >= p.tp) exitAt(a, p, Math.max(p.tp, bar.open), 'take profit');
+      else if (bar.close > I.exit[i] && bar.close > p.entry * (1 + DIP.minGain)) exitAt(a, p, bar.close * (1 - DIP.slip), 'back above the 10-day average');
+      else if (Math.round((t - p.t) / DAY) >= DIP.timeD) exitAt(a, p, bar.close * (1 - DIP.slip), 'time stop');
+    }
+    // 2) yesterday's buy limits; a stop touched the same day counts
+    for (const [a, o] of Object.entries(state.pend)) {
+      delete state.pend[a];
+      const b = bars[a]; if (!b || state.pos[a]) continue; // no candle today: the one-day order expires
+      const { bar } = b;
+      if (bar.low <= o.limit && Object.keys(state.pos).length < DIP.maxOpen) {
+        const entry = Math.min(o.limit, bar.open), stop = entry * (1 - o.sl), tp = entry * (1 + o.tp);
+        const qty = Math.min(state.eq * DIP.risk / (entry - stop), state.eq * DIP.maxAlloc / entry);
+        state.pos[a] = { t, entry, stop, tp, qty, risk: qty * (entry - stop), ctx: o.ctx };
+        day.fills.push({ asset: a, ...state.pos[a] });
+        if (bar.low <= stop) exitAt(a, state.pos[a], stop * (1 - DIP.slip), 'stop');
       }
-      const o = state.pend[a];
-      if (o) {
-        delete state.pend[a];
-        if (bar.low <= o.limit && Object.keys(state.pos).length < DIP.maxOpen) {
-          const entry = Math.min(o.limit, bar.open), stop = entry * (1 - o.sl), tp = entry * (1 + o.tp);
-          const qty = Math.min(state.eq * DIP.risk / (entry - stop), state.eq * DIP.maxAlloc / entry);
-          state.pos[a] = { t, entry, stop, tp, qty, risk: qty * (entry - stop), ctx: o.ctx };
-          day.fills.push({ asset: a, ...state.pos[a] });
-        }
-        continue;
-      }
+    }
+    // 3) drawdown with open positions marked at the close (as Brake measures it)
+    let m = state.eq; for (const [a, p] of Object.entries(state.pos)) if (bars[a]) m += p.qty * (bars[a].bar.close - p.entry);
+    state.peak = Math.max(state.peak, m); state.maxDD = Math.max(state.maxDD, 1 - m / state.peak); day.equity = m;
+    // 4) today's close: new dips
+    for (const [a, { I, i }] of Object.entries(bars)) {
+      if (state.pos[a] || day.fills.some(x => x.asset === a) || day.exits.some(x => x.asset === a)) continue;
       if (!regime || !(I.cl[i] > I.trend[i]) || !(I.rsi[i] < DIP.rsiMax)) continue;
       const sl = Math.min(DIP.maxStop, Math.max(DIP.minStop, DIP.stopATR * I.atr[i] / I.cl[i])), tp = DIP.targetATR * I.atr[i] / I.cl[i];
       const ctx = { signalT: t, btcVsAvg: +day.btcVsAvg.toFixed(4), btc3d: +btc3d.toFixed(4), vsTrend: +(I.cl[i] / I.trend[i] - 1).toFixed(4), rsi: +I.rsi[i].toFixed(1), drop3d: +(I.cl[i] / I.cl[i - 3] - 1).toFixed(4), atrPct: +(I.atr[i] / I.cl[i]).toFixed(4) };
@@ -100,7 +112,7 @@ export function trackJournalEntry(tr, headlines = []) {
   const day = new Date(c.signalT).toISOString().slice(0, 10);
   const r = +tr.r.toFixed(2), pnl = +tr.pnl.toFixed(2);
   return {
-    date: new Date(tr.t).toISOString().slice(0, 10) + 'T00:00', asset: tr.asset, side: 'long', entry: +px(tr.entry), stop: +px(tr.stop), exit: +px(tr.exit), size: +tr.qty.toPrecision(5), pnl, r,
+    date: new Date(tr.t).toISOString().slice(0, 10) + 'T00:00', asset: tr.asset, side: 'long', entry: +(+tr.entry).toPrecision(6), stop: +(+tr.stop).toPrecision(6), exit: +(+tr.exit).toPrecision(6), size: +tr.qty.toPrecision(5), pnl, r,
     strategy: 'Dip buyer', emotion: 'rules-based', tags: `example, paper-track, dip-buyer, ${tr.why === 'take profit' ? 'take-profit' : tr.why === 'stop' ? 'stop' : tr.why === 'time stop' ? 'time-stop' : 'average-exit'}`,
     thesis: [
       `Market on ${day}: BTC ${pct(c.btcVsAvg)} vs its 200-day average and ${pct(c.btc3d)} over 3 days, so the market filter was on.`,

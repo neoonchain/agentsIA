@@ -69,10 +69,10 @@ starting_balance: 10000
 min_trades: 50
 min_days: 30
 min_profit_factor: 1.5
-max_drawdown_pct: 12
+max_drawdown_pct: 25
 min_adherence_pct: 90
-daily_loss_pct: 3
-max_risk_per_trade_pct: 2
+daily_loss_pct: 6
+max_risk_per_trade_pct: 3
 fee_pct: 0.4
 slippage_pct: 0.05
 first_tier_usd: 250
@@ -132,10 +132,11 @@ Version 2, rewritten after Kairos's paper tests 1-8 (see [[Lessons/Range breakou
 const DIP_STRATEGY = `---
 name: Dip buyer
 status: stopped
-version: 1
+version: 2
+rules_engine: dip-buyer
 assets: [BTC-USD, ETH-USD, SOL-USD, XRP-USD, DOGE-USD, ADA-USD, LINK-USD, LTC-USD]
 timeframe: 1d
-risk_per_trade_pct: 1
+risk_per_trade_pct: 3
 hours_utc: "00:00-23:59"
 interval_min: 240
 max_positions: 4
@@ -145,8 +146,8 @@ trend_filter: false
 # Dip buyer
 
 Buy a sharp one or two day dip in a coin that is in an uptrend, only while the whole market is healthy, and sell the bounce.
-Paper test 9 (2019 to today, real daily prices, fees included): about 3 trades in 4 win. The wins are small, so the losses must stay small too.
-Its paper track is in the journal (tag #paper-track) and on the Track record. Rules are fixed in code (src/lib/dipbuyer.js); the AI applies them and reads the news.
+Half of the Kairos portfolio; the other half is [[Trend rider]]. Paper test 9 (real daily prices, fees included): about 3 trades in 4 win.
+Its paper track is in the journal (tag #dip-buyer) and on the Track record. Rules are fixed in code (src/lib/dipbuyer.js); the AI applies them and reads the news.
 
 ## Market first
 - Trade only while BTC closes above its 200-day average and has not fallen more than 10% in 3 days. Otherwise hold everything: in 2022 this rule kept the strategy out of the crash.
@@ -155,16 +156,69 @@ Its paper track is in the journal (tag #paper-track) and on the Track record. Ru
 ## Entry
 - The coin closes above its own 50-day average (uptrend) and RSI(2) closes under 15 (a sharp dip).
 - Buy with a limit order at that close, valid for the next day only. No chasing if it does not fill.
-- At most 4 positions open, at most 25% of the account in one coin, 1% of the account at risk.
+- At most 4 positions open, at most 25% of the account in one coin, 3% of the account at risk.
 
 ## Exit
 - Sell when a day closes back above the 10-day average (and at least +0.5% above entry), or at the target: 3 x ATR(14) above entry.
-- Stop 4 x ATR(14) below entry (between 3% and 20%). The stop is wide on purpose: dips often go a little further before they bounce.
+- Stop 4 x ATR(14) below entry (between 3% and 20%; in practice usually 20%). The stop is wide on purpose: dips often go further before they bounce.
 - Close anything still open after 10 days.
 
 ## Discipline
 - "Hold" is the usual answer: most days have no dip in an uptrend.
 - Never average down and never move the stop lower.
+`;
+
+const TREND_STRATEGY = `---
+name: Trend rider
+status: stopped
+version: 1
+rules_engine: trend-rider
+assets: [BTC-USD, ETH-USD, SOL-USD, XRP-USD, DOGE-USD, ADA-USD, LINK-USD, LTC-USD]
+timeframe: 1d
+risk_per_trade_pct: 3
+hours_utc: "00:00-23:59"
+interval_min: 240
+max_positions: 5
+trend_filter: false
+---
+
+# Trend rider
+
+Hold the coins that are trending while the market is strong, and step aside when they turn.
+Half of the Kairos portfolio; the other half is [[Dip buyer]]. It loses often and small (about 2 trades in 3) and wins big: that is how trend following works.
+Paper test 10 on real daily prices, fees included. Its paper track is in the journal (tag #trend-rider). Rules are fixed in code (src/lib/trendrider.js).
+
+## Market first
+- Buy only while BTC closes above its 50-day average. When it doesn't, no new buys; open positions keep their own exit.
+- Read the latest headlines (Argus). Skip a coin with fresh bad news of its own.
+
+## Entry
+- The coin closes above its 20-day average and is up over the last 20 days. Strongest 20-day return first.
+- Buy at the next day's open. At most 5 coins, 20% of the account each. No leverage.
+
+## Exit
+- Sell at the next open after a daily close under the 20-day average.
+- Safety stop 15% under entry (20% of the account x 15% = 3% at risk).
+
+## Discipline
+- Never sell a winner early "to lock it in": the big winners pay for all the small losses.
+- Expect drops of 30% or more from the top in a bad year. The 25% drawdown limit in [[rules]] counts both halves together.
+`;
+
+const TREND_LESSONS = `---
+strategy: Trend rider
+tags: [lessons]
+---
+
+# Lessons · Trend rider
+
+What paper test 10 taught it (8 coins, daily candles, Jan 2019 to Nov 2026).
+
+- Most trades lose, a few win big: over the last two years about 3 in 10 won, and one ADA trade alone made +11.6R (Nov to Dec 2024).
+- The market filter matters less than the exit: selling on a close under the 20-day average is what keeps the losses small.
+- A safety stop of 15% almost never triggers before the average exit; tighter stops (8-10%) cut the return in half by selling good trends on normal noise.
+- Drops are deep: about 37% from the top in 2026 and 42% in 2022. Running it next to Dip buyer, half each, cut the drop to about 24% over the last two years.
+- It needs strong markets. With BTC flat over the last two years it still made money because single coins (ADA, XRP, DOGE) trended hard.
 `;
 
 const DIP_LESSONS = `---
@@ -174,13 +228,14 @@ tags: [lessons]
 
 # Lessons · Dip buyer
 
-What paper test 9 taught it (8 coins, daily candles, Jan 2019 to Nov 2026).
+What paper test 9 taught it (8 coins, daily candles, Jan 2019 to Nov 2026, 3% risk, conservative fills).
 
-- The market filter carries the strategy. Without "BTC above its 200-day average" the same dips earned far less (profit factor 1.09 instead of 1.32, drawdown 11% instead of 8%) and lost 7% in 2022; with it, 2022 had no trades at all.
-- A high win rate needs small targets, so fees matter: limit orders for entries and exits (0.25%), not market orders (0.4%).
-- Three exits in four are "back above the 10-day average", most often after just 2 days. A dip that has not bounced after 10 days usually will not: the time stop cut those for -0.3R on average (-0.85R at worst).
-- Bad years exist: 2019 and 2024 lost money (63-67% wins, but the losses were bigger than the wins). The win rate alone does not make it profitable.
+- The market filter carries the strategy: in 2022 "BTC above its 200-day average" kept it out of the crash entirely (no trades), while Trend rider lost 37% that year.
+- The win rate is high (73% of 277 trades) because the wins are small: three exits in four are "back above the 10-day average", most often after just 2 days.
+- The losses are what decide a year. 30 stops cost about -1R each, and 39 time stops -0.35R on average (-0.85R at worst): a dip that has not bounced in 10 days usually will not.
+- Bad years exist: 2019 lost 2.9% and 2024 lost 17.4% (a 26% drop from the top) with 64-67% wins. The win rate alone does not make it profitable.
 - When BTC, ETH and SOL dip on the same day it is one bet, not three: in October 2026 all three hit the time stop together.
+- Fees matter for small wins: a limit order to buy the dip (0.25%) instead of a market order (0.40% + slippage).
 `;
 
 /** The lessons Range breakout starts with: what Kairos's own paper tests taught it. */
@@ -300,23 +355,29 @@ export function initVault(root) {
     ['Lessons/Memecoin momentum.md', MEME_LESSONS],
     ['Strategies/Dip buyer.md', DIP_STRATEGY],
     ['Lessons/Dip buyer.md', DIP_LESSONS],
+    ['Strategies/Trend rider.md', TREND_STRATEGY],
+    ['Lessons/Trend rider.md', TREND_LESSONS],
   ];
   for (const [rel, content] of seed) {
     const f = path.join(root, rel);
     if (!fs.existsSync(f)) fs.writeFileSync(f, content);
   }
   // v2 strategies: upgrade a note only if the user never edited the original v1 text (its status is kept)
-  for (const [rel, v2text, marks] of [
+  for (const [rel, v2text, marks, fromVersion] of [
     ['Strategies/Range breakout.md', STRATEGY, ['Works best during European hours. Big losses come from entering before the candle closes.', 'take profit at 2R.']],
     ['Strategies/Memecoin momentum.md', MEME, ['Enter only with a catalyst: a fresh headline or tweet about the coin (news feed)', 'Never more than one memecoin position at a time.']],
+    ['Strategies/Dip buyer.md', DIP_STRATEGY, ['At most 4 positions open, at most 25% of the account in one coin, 1% of the account at risk.'], 1],
   ]) {
     const sf = path.join(root, rel);
     try { const n = parse(fs.readFileSync(sf, 'utf8'));
-      if (!n.data.version && marks.every(m => n.body.includes(m))) { const v2 = parse(v2text); fs.writeFileSync(sf, stringify({ ...v2.data, status: n.data.status || 'stopped' }, v2.body)); }
+      if ((n.data.version || 0) === (fromVersion || 0) && marks.every(m => n.body.includes(m))) { const v2 = parse(v2text); fs.writeFileSync(sf, stringify({ ...v2.data, status: n.data.status || 'stopped' }, v2.body)); }
     } catch { /* the user renamed or removed it */ }
   }
   // add rules introduced in later versions to existing vaults, without touching the user's values
   const rf = path.join(root, 'rules.md'), cur = parse(fs.readFileSync(rf, 'utf8')), defaults = parse(RULES).data;
+  if (cur.data.max_drawdown_pct === 12 && cur.data.daily_loss_pct === 3 && cur.data.max_risk_per_trade_pct === 2) { // the old defaults, untouched: the portfolio's limits
+    Object.assign(cur.data, { max_drawdown_pct: 25, daily_loss_pct: 6, max_risk_per_trade_pct: 3 }); fs.writeFileSync(rf, stringify(cur.data, cur.body));
+  }
   const missing = Object.keys(defaults).filter(k => !(k in cur.data));
   if (missing.length) fs.writeFileSync(rf, stringify({ ...cur.data, ...Object.fromEntries(missing.map(k => [k, defaults[k]])) }, cur.body));
 }
@@ -420,9 +481,13 @@ export function createJournalTrade(root, t) {
   const side = t.side === 'short' ? 'short' : 'long';
   const date = /^\d{4}-\d{2}-\d{2}/.test(t.date || '') ? String(t.date).slice(0, 16).replace('T', ' ') : new Date().toISOString().slice(0, 16).replace('T', ' ');
   const asset = safeName(t.asset || 'ASSET').toUpperCase();
+  const entry = num(t.entry) ?? 0, stop = num(t.stop) ?? 0, exit = num(t.exit) ?? 0, size = num(t.size) ?? 0, dir = side === 'long' ? 1 : -1;
+  // write the real PnL and R into the note, so Obsidian and Dataview see the same numbers as the app
+  const pnl = num(t.pnl) ?? (entry && exit && size ? +((exit - entry) * size * dir).toFixed(2) : 0);
+  const r = num(t.r) ?? (entry && stop && exit && entry !== stop ? +(((exit - entry) * dir) / Math.abs(entry - stop)).toFixed(2) : undefined);
   const data = {
-    date, asset, side, entry: num(t.entry) ?? 0, stop: num(t.stop) ?? 0, exit: num(t.exit) ?? 0, size: num(t.size) ?? 0,
-    pnl: num(t.pnl) ?? 0, r: num(t.r) ?? undefined, strategy: String(t.strategy || ''), emotion: String(t.emotion || ''),
+    date, asset, side, entry, stop, exit, size,
+    pnl, r, strategy: String(t.strategy || ''), emotion: String(t.emotion || ''),
     tags: String(t.tags || '').split(',').map(s => s.trim().replace(/^#/, '')).filter(Boolean),
   };
   const body = `## Thesis\n${t.thesis || ''}\n\n## Psychology\n${t.psychology || ''}\n\n## Went well\n${t.wentWell || ''}\n\n## Went wrong\n${t.wentWrong || ''}\n`;

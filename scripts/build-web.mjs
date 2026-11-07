@@ -30,4 +30,10 @@ let html = fs.readFileSync(path.join(root, 'src/public/app.html'), 'utf8')
     `<script type="importmap">${JSON.stringify(importMap)}</script>\n<script>window.KAIROS_FREE_PROXY = ${JSON.stringify(freeProxy)};</script>\n<script src="./boot.js" type="module"></script>`);
 if (html.includes('/app.js')) throw new Error('app.html script tag not found');
 fs.writeFileSync(path.join(out, 'app/index.html'), html);
+// precache the web app's own files (not the example charts: those are fetched once when the vault is seeded)
+const appFiles = []; (function walk(d, rel) { for (const e of fs.readdirSync(d, { withFileTypes: true })) e.isDirectory() ? walk(path.join(d, e.name), `${rel}${e.name}/`) : appFiles.push(`${rel}${e.name}`); })(path.join(out, 'app'), 'app/');
+const pre = ['./', 'tour', 'manifest.webmanifest', 'app/', ...appFiles.filter(f => f !== 'app/index.html'), 'assets/ia.jpg', 'assets/favicon.svg', 'assets/icon-192.png'];
+const sw = fs.readFileSync(path.join(out, 'sw.js'), 'utf8');
+if (!sw.includes('const PRECACHE = [];')) throw new Error('sw.js PRECACHE placeholder not found');
+fs.writeFileSync(path.join(out, 'sw.js'), sw.replace('const PRECACHE = [];', `const PRECACHE = ${JSON.stringify(pre)};`));
 console.log(`Built ${out} (free-trial proxy: ${freeProxy || 'none'})`);
