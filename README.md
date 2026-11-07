@@ -25,7 +25,7 @@ Then open http://localhost:4317/app. The landing page is at http://localhost:431
 
 ### Desktop app
 
-Download the installer from [Releases](https://github.com/neoonchain/agentsIA/releases/latest): `.dmg` (macOS), `.exe` (Windows), `.AppImage` or `.deb` (Linux).
+Download the installer for your system and open it: [macOS](https://github.com/neoonchain/agentsIA/releases/latest/download/Kairos-mac-universal.dmg) · [Windows](https://github.com/neoonchain/agentsIA/releases/latest/download/Kairos-win-x64.exe) · [Linux](https://github.com/neoonchain/agentsIA/releases/latest/download/Kairos-linux-x86_64.AppImage) (all versions on [Releases](https://github.com/neoonchain/agentsIA/releases/latest)).
 
 The installers are not code-signed yet:
 - **macOS:** right-click the app, choose Open, then Open again.

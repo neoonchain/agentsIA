@@ -20,7 +20,7 @@
   "build": {
     "appId": "io.kairos.desktop",
     "productName": "Kairos",
-    "artifactName": "Kairos-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Kairos-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -53,8 +53,7 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "universal"
           ]
         }
       ],
@@ -72,9 +71,10 @@
       "icon": "build/icon.png"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true,
+      "createStartMenuShortcut": true
     },
     "linux": {
       "target": [
@@ -93,6 +93,25 @@
         "repo": "agentsIA",
         "releaseType": "release"
       }
-    ]
+    ],
+    "dmg": {
+      "title": "Kairos",
+      "contents": [
+        {
+          "x": 150,
+          "y": 190
+        },
+        {
+          "x": 410,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 560,
+        "height": 380
+      }
+    }
   }
 }

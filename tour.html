@@ -893,19 +893,24 @@ try{if(!sessionStorage.getItem('kairos-intro')&&!matchMedia('(prefers-reduced-mo
     <h2>It runs on your computer, next to your vault.</h2>
     <p>Open the web app on this site to try it in seconds: everything stays in your browser, and paper trading runs while the tab is open. Install the desktop app for paper trading around the clock, RSS and X news, and real money on Kraken: your journal and keys never leave your machine.</p>
   </div>
-  <div class="row-dl reveal">
-    <a class="btn dark" href="https://github.com/neoonchain/agentsIA/releases/latest">Download for macOS <span class="arr">↓</span></a>
-    <a class="btn" href="https://github.com/neoonchain/agentsIA/releases/latest">Windows <span class="arr">↓</span></a>
-    <a class="btn" href="https://github.com/neoonchain/agentsIA/releases/latest">Linux <span class="arr">↓</span></a>
+  <div class="row-dl reveal" id="dlRow">
+    <a class="btn dark" data-os="mac" href="https://github.com/neoonchain/agentsIA/releases/latest/download/Kairos-mac-universal.dmg">Download for macOS <span class="arr">↓</span></a>
+    <a class="btn" data-os="win" href="https://github.com/neoonchain/agentsIA/releases/latest/download/Kairos-win-x64.exe">Windows <span class="arr">↓</span></a>
+    <a class="btn" data-os="linux" href="https://github.com/neoonchain/agentsIA/releases/latest/download/Kairos-linux-x86_64.AppImage">Linux <span class="arr">↓</span></a>
   </div>
-  <p class="note-s" style="margin:12px 0 40px">Installers are unsigned for now. On macOS: right-click the app, choose Open, then Open again. On Windows: More info, then Run anyway.</p>
-  <h3 style="font-size:18px;font-weight:500;margin-bottom:16px">Or run it from source</h3>
+  <p class="note-s" style="margin:12px 0 40px">Free. macOS 11 or newer (Apple silicon and Intel), Windows 10 or newer, or Linux. No account, no terminal, nothing else to install.</p>
   <div class="get reveal">
-    <div><span class="k">01</span><h3>Install Node.js</h3><p>Version 20 or newer, from nodejs.org. Nothing else is needed: the app has no dependencies.</p></div>
-    <div><span class="k">02</span><h3>Download Kairos</h3><p>Get the code from GitHub and open the folder in a terminal.</p><div class="code"><pre>git clone https://github.com/neoonchain/agentsIA
-cd agentsIA</pre><button class="copy" type="button">Copy</button></div></div>
-    <div><span class="k">03</span><h3>Start it</h3><p>Then open <b>localhost:4317/app</b> in your browser. Your vault is created in <b>~/TradingVault</b>; open it in Obsidian.</p><div class="code"><pre>npm start</pre><button class="copy" type="button">Copy</button></div></div>
+    <div><span class="k">01</span><h3>Download</h3><p>Click the button. The installer lands in your browser's downloads.</p></div>
+    <div><span class="k">02</span><h3>Open it</h3><p><b>Mac:</b> open the file and drag Kairos into Applications. <b>Windows:</b> open the file and it installs itself. <b>Linux:</b> open the AppImage.</p></div>
+    <div><span class="k">03</span><h3>Kairos opens</h3><p>It starts on your desktop with the example journal and creates your vault, <b>TradingVault</b> in your home folder, ready for Obsidian.</p></div>
   </div>
+  <p class="note-s" style="margin-top:22px">The first time only: Kairos isn't signed with Apple or Microsoft yet, so your computer asks once. <b>Mac:</b> if it says it can't check the app, open System Settings → Privacy &amp; Security and click <b>Open Anyway</b>. <b>Windows:</b> click <b>More info</b>, then <b>Run anyway</b>. Developers can also <a href="https://github.com/neoonchain/agentsIA#readme" target="_blank" rel="noopener noreferrer">run it from source</a>.</p>
+  <script>
+  // put the visitor's own system first
+  (() => { const ua = navigator.userAgent, os = /Mac/.test(ua) && !/iPhone|iPad/.test(ua) ? 'mac' : /Win/.test(ua) ? 'win' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : null;
+    if (!os) return; const row = document.getElementById('dlRow'), names = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
+    row.querySelectorAll('a').forEach(a => { const me = a.dataset.os === os; a.classList.toggle('dark', me); a.innerHTML = (me ? `Download for ${names[a.dataset.os]}` : names[a.dataset.os]) + ' <span class="arr">↓</span>'; if (me) row.prepend(a); }); })();
+  </script>
 </div></section>
 </main>
 

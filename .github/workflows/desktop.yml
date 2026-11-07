@@ -1,8 +1,10 @@
 name: Desktop installers
 
-# Builds the macOS (.dmg), Windows (.exe) and Linux (.AppImage, .deb) installers.
+# Builds the macOS (.dmg, universal), Windows (.exe) and Linux (.AppImage, .deb) installers.
 # - Every push that touches the app: build and keep the installers as workflow artifacts.
-# - Pushing a tag like v0.1.0: also publish them as a GitHub Release people can download.
+# - Pushes to main (and tags like v0.1.0): also publish them as the latest GitHub Release, under fixed
+#   file names, so the website's buttons download them directly:
+#   releases/latest/download/Kairos-mac-universal.dmg · Kairos-win-x64.exe · Kairos-linux-x86_64.AppImage
 on:
   push:
     branches: ['**']
@@ -52,7 +54,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -62,5 +64,9 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v0.1.{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Kairos 0.1.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: dist/*
           generate_release_notes: true
