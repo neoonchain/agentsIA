@@ -171,8 +171,13 @@ html.loading #loader{display:block}
 .dock:hover .app-i{transform:translateY(-3px)}
 .dock .app-i:hover{transform:translateY(-12px) scale(1.18)}
 .app-i svg{width:58%;height:58%}
-.app-i.kai{background:#fff}
-.app-i.kai svg{color:#000}
+.app-i.full{overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.28)}
+.app-i.full svg,.app-i.full img{width:100%;height:100%;display:block}
+.app-i.kai{overflow:visible;box-shadow:none;border-radius:0}
+.app-i.kai img{transform:scale(1.163)} /* the PNG keeps the macOS icon margin; the Dock shows it at the same size as its neighbours */
+.dock-sep{width:1px;align-self:stretch;margin:6px 2px;background:rgba(255,255,255,.22)}
+.app-i.full[title="Trash"]{box-shadow:none;overflow:visible}
+@media (max-width:520px){.dock-sep,.app-i[title="Trash"]{display:none}}
 .app-i.kai::after{content:"";position:absolute;bottom:-9px;width:4px;height:4px;border-radius:50%;background:#bfc3cf}
 .app-i.kai.pop{animation:pop 1.2s var(--ease)}
 @keyframes pop{0%{transform:translateY(-60px) scale(.4);opacity:0}60%{transform:translateY(6px) scale(1.06);opacity:1}100%{transform:none}}
@@ -320,11 +325,13 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
   <button class="dock-btn" id="dockBtn">Put Kairos in my Dock <span>→</span></button>
   <div class="how" id="how" role="status"></div>
   <div><div class="dock" aria-hidden="true">
-    <span class="app-i" style="background:linear-gradient(160deg,#6fd8fb,#0055ff)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 7h16v12H4z"/><path d="M4 7l3-3h10l3 3"/></svg></span>
-    <span class="app-i" style="background:linear-gradient(160deg,#fff,#dfe3ea)"><svg viewBox="0 0 24 24" fill="none" stroke="#0055ff" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/></svg></span>
-    <span class="app-i kai" id="kaiIcon"><svg><use href="#mark"/></svg></span>
-    <span class="app-i" style="background:linear-gradient(160deg,#9cf09a,#1fae4c)"><svg viewBox="0 0 24 24" fill="#fff"><path d="M4 6h16v10H9l-5 4z"/></svg></span>
-    <span class="app-i" style="background:linear-gradient(160deg,#ffe27a,#f5a524)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M6 4h12v16H6zM9 9h6M9 13h6M9 17h3"/></svg></span>
+    <span class="app-i full" title="Finder"><svg viewBox="0 0 64 64"><defs><linearGradient id="fdL" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fdcff"/><stop offset="1" stop-color="#3aa8f4"/></linearGradient><linearGradient id="fdR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8cf0"/><stop offset="1" stop-color="#1157d8"/></linearGradient></defs><rect width="64" height="64" fill="url(#fdR)"/><path d="M0 0h35c-4 9-6 17-6 25h5c-1 7-1 13 0 19-3 7-4 13-3 20H0z" fill="url(#fdL)"/><path d="M19 19v8M44 19v8" stroke="#0b2a5c" stroke-width="3" stroke-linecap="round"/><path d="M16 42c9 7 23 7 32 0" fill="none" stroke="#0b2a5c" stroke-width="3" stroke-linecap="round"/></svg></span>
+    <span class="app-i full" title="Safari"><svg viewBox="0 0 64 64"><defs><linearGradient id="sfB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e3e6ec"/></linearGradient><radialGradient id="sfC" cx=".5" cy=".38" r=".62"><stop offset="0" stop-color="#3fd2ff"/><stop offset="1" stop-color="#1366e6"/></radialGradient></defs><rect width="64" height="64" fill="url(#sfB)"/><circle cx="32" cy="32" r="25" fill="url(#sfC)"/><g stroke="#fff" stroke-width="1.2" opacity=".85"><path d="M32 9v4M32 51v4M9 32h4M51 32h4M15.7 15.7l2.8 2.8M45.5 45.5l2.8 2.8M15.7 48.3l2.8-2.8M45.5 18.5l2.8-2.8"/></g><path d="M45 19L35 35 29 29z" fill="#ff3b30"/><path d="M19 45l10-16 6 6z" fill="#fff"/></svg></span>
+    <span class="app-i full kai" id="kaiIcon" title="Kairos"><img src="assets/icon-512.png" alt="" width="68" height="68"></span>
+    <span class="app-i full" title="Messages"><svg viewBox="0 0 64 64"><defs><linearGradient id="msG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ff07a"/><stop offset="1" stop-color="#0dbf3b"/></linearGradient></defs><rect width="64" height="64" fill="url(#msG)"/><path d="M32 14c-12.7 0-23 7.9-23 17.6 0 5.6 3.4 10.6 8.8 13.8-.6 3-2.4 5.7-4.6 7.4 4.6.3 9-1.4 12-4 2.2.5 4.4.8 6.8.8 12.7 0 23-7.9 23-17.6S44.7 14 32 14z" fill="#fff"/></svg></span>
+    <span class="app-i full" title="Notes"><svg viewBox="0 0 64 64"><defs><linearGradient id="ntY" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd84a"/><stop offset="1" stop-color="#f9c21b"/></linearGradient></defs><rect width="64" height="64" fill="#fdfdfb"/><rect width="64" height="19" fill="url(#ntY)"/><g stroke="#d9d9d4" stroke-width="1.4"><path d="M0 30h64M0 40h64M0 50h64"/></g><g fill="#c9c9c4"><circle cx="8" cy="25" r="1"/><circle cx="16" cy="25" r="1"/><circle cx="24" cy="25" r="1"/><circle cx="32" cy="25" r="1"/><circle cx="40" cy="25" r="1"/><circle cx="48" cy="25" r="1"/><circle cx="56" cy="25" r="1"/></g></svg></span>
+    <span class="dock-sep"></span>
+    <span class="app-i full" title="Trash"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="none"/><path d="M17 18h30l-3 38a3 3 0 0 1-3 3H23a3 3 0 0 1-3-3z" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.55)" stroke-width="1.4"/><path d="M14 16h36" stroke="rgba(255,255,255,.7)" stroke-width="2.4" stroke-linecap="round"/><g stroke="rgba(255,255,255,.35)" stroke-width="1.2"><path d="M25 23l1 31M32 23v31M39 23l-1 31"/></g></svg></span>
   </div></div>
   <p class="dock-cap lbl">Shown in a macOS Dock. On Windows it goes in the taskbar,<br>on iPhone and iPad on the Home Screen.</p>
 </section>
