@@ -11,6 +11,7 @@ import * as L from './live.js';
 import { seedExamples, attachExampleCharts } from './examples.js';
 import { dailyReadings, readingsText, stepTrack, trackJournalEntry, trackDecision, DIP_ASSETS, DAY } from './dipbuyer.js';
 import { stepTrend, trendDecision, trendJournalEntry, trendReadings } from './trendrider.js';
+import { isPerp } from './hyperliquid.js';
 import { RUN4_DECISIONS } from './examples-decisions.js';
 import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf, relayPoll } from './news.js';
 import { getCandles1m } from './market.js';
@@ -620,6 +621,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     if (this.liveOf(name)?.mode === mode) throw Object.assign(new Error(`Already live in ${mode} mode`), { status: 400 });
     if (this.liveOf(name) && Object.keys(this.liveOf(name).account.positions).length) throw Object.assign(new Error('Close the open live positions before switching mode'), { status: 400 });
     if (mode === 'real' && confirm !== s.name) throw Object.assign(new Error('Type the strategy name to confirm real money'), { status: 400 });
+    if (s.assets.some(isPerp)) throw Object.assign(new Error('Hyperliquid markets (-PERP) are paper-only for now: real money on HyperCore comes with Kairos on Elysium'), { status: 400, code: 'PAPER_ONLY' });
     for (const a of s.assets) await K.resolvePair(a); // every asset must exist on Kraken
     const allocationUsd = Number(promo.tierUsd) || 250;
     if (mode === 'real') {

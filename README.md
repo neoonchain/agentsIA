@@ -75,6 +75,11 @@ npm test
 - **Evaluator**: checks paper trades, days, profit factor, max drawdown, adherence to the strategy and net profit against `rules.md`. Only then can you request and approve real capital.
 - **Prices**: public Coinbase API (Kraken fallback). Paper fills include fees and slippage from `rules.md`.
 
+## Markets
+
+- **Coinbase and Kraken spot** (`BTC-USD`, `ETH-USD`, ...): prices, candles and the shock detector. Real money runs on Kraken spot.
+- **Hyperliquid perps** (`BTC-PERP`, `WIF-PERP`, `KPEPE-PERP`, ...): 170+ markets from HyperCore's public API, memecoins included, for **paper trading only** for now. `kPEPE` is 1,000 PEPE, as on Hyperliquid. Put these ids in a strategy's `assets` to paper trade them. Real money on HyperCore is planned through Kairos on Elysium, Kinetiq's Layer 2 for Hyperliquid, once its HyperCore trading upgrade ships. Until then, `enableLive` refuses `-PERP` strategies.
+
 ## Real money (Kraken)
 
 1. In **Team settings → Kraken**, connect an API key with only *Query Funds*, *Query Open/Closed Orders & Trades*, *Create & Modify Orders* and *Cancel/Close Orders*. The app refuses any key that can withdraw.

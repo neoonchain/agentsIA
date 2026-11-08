@@ -1,5 +1,6 @@
 // Public crypto prices: Coinbase first, Kraken as fallback (covers memecoins Coinbase lacks). No keys needed.
 import * as K from './kraken.js';
+import * as HL from './hyperliquid.js';
 const cache = new Map();
 const TTL = 15000;
 let mock = null; // { prices: {asset: number}, candles?: [...] } for tests
@@ -21,7 +22,8 @@ export async function getPrice(asset) {
   const hit = cache.get('p:' + asset);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   let v;
-  try {
+  if (HL.isPerp(asset)) v = await HL.price(asset); // Hyperliquid perps
+  else try {
     v = Number((await getJSON(`https://api.coinbase.com/v2/prices/${asset}/spot`)).data.amount);
   } catch (e) {
     v = (await K.ticker(asset)).last;
@@ -38,7 +40,8 @@ export async function getCandles(asset, limit = 48) {
   const hit = cache.get('c:' + asset);
   if (hit && Date.now() - hit.t < 60000) return hit.v.slice(-limit);
   let v;
-  try {
+  if (HL.isPerp(asset)) v = await HL.candles(asset, '1h', 300);
+  else try {
     const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=3600`);
     v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
   } catch { v = await K.ohlc(asset, 60); }
@@ -53,7 +56,8 @@ export async function getDailyCandles(asset, limit = 60, { fresh = false } = {})
   const hit = cache.get('d:' + asset);
   if (!fresh && hit && Date.now() - hit.t < 15 * 60000) return hit.v.slice(-limit);
   let v;
-  try {
+  if (HL.isPerp(asset)) v = await HL.candles(asset, '1d', Math.max(limit, 300));
+  else try {
     const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=86400`);
     v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
   } catch { v = await K.ohlc(asset, 1440); }
@@ -65,6 +69,7 @@ export async function getDailyCandles(asset, limit = 60, { fresh = false } = {})
 export async function getDailyRange(asset, start) {
   if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
   if (mock) return (mock.daily?.[asset] || []).filter(c => c.t >= start);
+  if (HL.isPerp(asset)) return HL.dailySince(asset, start);
   const rows = new Map(), D = 86400000, end = Date.now();
   for (let t = start; t < end; t += 300 * D) {
     const r = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=86400&start=${new Date(t).toISOString()}&end=${new Date(Math.min(end, t + 300 * D)).toISOString()}`);
@@ -86,6 +91,7 @@ export function dailyTrend(daily, price) {
 export async function getCandles1m(asset, limit = 61) {
   if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
   if (mock) return (mock.candles1m?.[asset] || []).slice(-limit);
+  if (HL.isPerp(asset)) return HL.candles(asset, '1m', limit);
   let v;
   try {
     const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=60`);
