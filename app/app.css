@@ -400,3 +400,5 @@ label.ri input{width:auto}
 .cc-d p{margin:4px 0 0;font-size:12.5px;color:var(--mute)}
 .cc-d.opened b,.cc-d.order b{color:#0055ff}.cc-d.closed b{color:#22a06b}.cc-d.blocked b{color:#f0503c}
 @media (max-width:980px){.chartcard{grid-template-columns:minmax(0,1fr)}.cc-side{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px}.cc-canvas{height:300px}}
+
+.wc-id{font-family:var(--mono,monospace);font-size:.72em;color:var(--mute-2);margin-left:6px;letter-spacing:.02em}

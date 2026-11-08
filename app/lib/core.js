@@ -12,6 +12,7 @@ import { seedExamples, attachExampleCharts } from './examples.js';
 import { dailyReadings, readingsText, stepTrack, trackJournalEntry, trackDecision, DIP_ASSETS, DAY } from './dipbuyer.js';
 import { stepTrend, trendDecision, trendJournalEntry, trendReadings } from './trendrider.js';
 import { isPerp } from './hyperliquid.js';
+import { marketName } from './markets.js';
 import { RUN4_DECISIONS } from './examples-decisions.js';
 import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf, relayPoll } from './news.js';
 import { getCandles1m } from './market.js';
@@ -263,7 +264,7 @@ export class App {
 
       return await this.instruction('trade', async ins => {
         const steps = [];
-        const market = s.assets.map(a => `## ${a} price ${prices[a]}\n${charts[a]}`).join('\n\n');
+        const market = s.assets.map(a => `## ${a} price ${prices[a]}${marketName(a) !== a ? ` · ${marketName(a)}` : ''}\n${charts[a]}`).join('\n\n');
         const positions = Object.values(acc.positions).map(p => `${p.asset} ${p.side} qty ${px(p.qty)} entry ${px(p.entry)} stop ${p.stop} tp ${p.takeProfit}`).join('\n') || 'none';
         const where = live ? 'REAL-MONEY (Kraken spot: long only, no shorting, no leverage)' : 'paper';
         const ctxParts = [`Strategy note [[${s.name}]]:\n${s.body}`, `Strategy settings: assets ${s.assets.join(', ')}, hours ${s.hours_utc || 'any'} UTC, max risk ${Math.min(Number(s.risk_per_trade_pct) || 1, Number(rules.max_risk_per_trade_pct) || 2)}% per trade.`,

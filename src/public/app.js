@@ -1,4 +1,5 @@
 // Kairos workspace UI. Everything model- or vault-generated is escaped before rendering.
+import { marketName, marketVenue } from './lib/markets.js';
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -6,7 +7,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT']);
 const coinBase = a => { const b = String(a || '').split('-')[0].toUpperCase(); return /^K[A-Z]{3,}$/.test(b) && COINS.has(b.slice(1)) ? b.slice(1) : b; };
 const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="../assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
-const withCoin = a => `<span class="wc">${coin(a)}${esc(a)}</span>`;
+// the market's real name, with its id small next to it ("Nasdaq 100  XYZ100-XYZ")
+const withCoin = a => { const n = marketName(a); return `<span class="wc" title="${esc(a)} · ${esc(marketVenue(a))}">${coin(a)}${esc(n)}${n.toUpperCase() !== String(a).toUpperCase() ? `<small class="wc-id">${esc(a)}</small>` : ''}</span>`; };
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const fp = x => (typeof x === 'number' && Number.isFinite(x) ? (Math.abs(x) >= 1 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : Number(x.toPrecision(4)).toString()) : (x ?? '–'));
 /** Small samples show counts, not a misleading percentage. */

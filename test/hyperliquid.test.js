@@ -50,3 +50,10 @@ test('Hyperliquid markets are paper-only until Kairos trades HyperCore through E
   app.config.kraken = { key: 'k', secret: 's' }; app.config.apiKey = 'x';
   await assert.rejects(app.enableLive('Perp test', { mode: 'validate' }), e => e.code === 'PAPER_ONLY' && /paper-only/.test(e.message));
 });
+
+test('markets show their real name: Nasdaq 100, Gold, Oil, PEPE ×1000, Bitcoin', async () => {
+  const { marketName, marketVenue } = await import('../src/lib/markets.js');
+  assert.equal(marketName('XYZ100-XYZ'), 'Nasdaq 100'); assert.equal(marketName('GOLD-XYZ'), 'Gold'); assert.equal(marketName('CL-XYZ'), 'Oil (WTI)');
+  assert.equal(marketName('KPEPE-PERP'), 'PEPE ×1000'); assert.equal(marketName('BTC-USD'), 'Bitcoin'); assert.equal(marketName('NEWCOIN-PERP'), 'NEWCOIN');
+  assert.equal(marketVenue('GOLD-XYZ'), 'Hyperliquid · Trade.xyz'); assert.equal(marketVenue('BTC-USD'), 'Spot');
+});
