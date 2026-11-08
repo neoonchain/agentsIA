@@ -281,7 +281,7 @@ const views = {
     $('#newTrade').onclick = () => { f.hidden = false; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); f.asset.focus(); };
     $('#cancelTrade').onclick = () => { f.hidden = true; };
     view.querySelectorAll('[data-month]').forEach(b => (b.onclick = () => { views.journal.month = b.dataset.month; render(); }));
-    if ($('#sharePnl')) $('#sharePnl').onclick = () => openShare(trades, views.journal.month);
+    if ($('#sharePnl')) $('#sharePnl').onclick = () => openShare(trades, views.journal.month || new Date().toISOString().slice(0, 7)); // the month on screen
     if ($('#jMore')) $('#jMore').onclick = () => { const was = views.journal.more; views.journal.more = !was; render(); if (was) $('#jfilter')?.scrollIntoView({ block: 'start' }); };
     if ($('#jfilter')) $('#jfilter').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { views.journal.filter = b.dataset.f; render(); } };
     // screenshot: click, drop or paste; compressed in the browser before upload
@@ -766,12 +766,15 @@ function pnlCalendar(trades, month, why = []){
 /* ---------- shareable PnL card: counts from 0 to the PnL; PNG or video; your own image or video behind ---------- */
 function openShare(trades, month){
   const months = [...new Set(trades.map(t => String(t.date).slice(0, 7)))].sort();
-  const st = { period: 'all', unit: 'usd', bg: null, bgKind: null, rec: false };
+  const st = { period: months.includes(month) ? month : 'all', unit: 'usd', bg: null, bgKind: null, rec: false };
+  // % of what: your starting balance, or $5,000 per paper track for the example trades
+  let base = 10000; const ex = trades.length && trades.every(t => (t.tags || []).includes('example'));
+  if (ex) base = 5000 * new Set(trades.map(t => t.strategy)).size; else api('/rules').then(r => { base = Number(r.starting_balance) || 10000; }).catch(() => {});
   $('#dlgTitle').textContent = 'Share your PnL';
   $('#dlgBody').innerHTML = `<div class="share">
     <canvas id="shareCv" width="1080" height="1350"></canvas>
     <div class="share-c">
-      <label>Period<select id="shP"><option value="all">All time</option>${months.slice().reverse().map(m => `<option value="${m}" ${m === month ? '' : ''}>${new Date(m + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</option>`).join('')}</select></label>
+      <label>Period<select id="shP"><option value="all">All time</option>${months.slice().reverse().map(m => `<option value="${m}" ${m === st.period ? 'selected' : ''}>${new Date(m + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</option>`).join('')}</select></label>
       <label>Show<select id="shU"><option value="usd">PnL in dollars</option><option value="r">PnL in R</option><option value="pct">Return in %</option></select></label>
       <label>Background<select id="shB"><option value="kairos">Kairos pixels</option><option value="granite">Granite</option><option value="file">My image or video…</option></select></label>
       <input type="file" id="shF" accept="image/*,video/*" hidden>
@@ -786,7 +789,7 @@ function openShare(trades, month){
   const data = () => { const ts = trades.filter(t => st.period === 'all' || String(t.date).startsWith(st.period)).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const pnl = ts.reduce((a, t) => a + t.pnl, 0), r = ts.reduce((a, t) => a + (+t.r || 0), 0), w = ts.filter(t => t.pnl > 0).length, gl = -ts.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0), gp = ts.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
     let c = 0; const curve = [0, ...ts.map(t => (c += t.pnl))];
-    return { ts, pnl, r, pct: pnl / 10000 * 100, wins: w, n: ts.length, pf: gl > 0 ? gp / gl : null, curve }; };
+    return { ts, pnl, r, pct: pnl / base * 100, wins: w, n: ts.length, pf: gl > 0 ? gp / gl : null, curve }; };
   const ease = t => 1 - Math.pow(1 - t, 3);
   function cover(src, w, h){ const sr = w / h, dr = W / H; let sw = w, sh = h, sx = 0, sy = 0; if (sr > dr) { sw = h * dr; sx = (w - sw) / 2; } else { sh = w / dr; sy = (h - sh) / 2; } ctx.drawImage(src, sx, sy, sw, sh, 0, 0, W, H); }
   function bg(t){
@@ -815,7 +818,7 @@ function openShare(trades, month){
     for (let i = 0; i <= upto; i++) { const x = cx + (c.length > 1 ? i / (c.length - 1) : 0) * cw, y = cy + ch - (c[i] - lo) / span * ch; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
     // stats
     ctx.globalAlpha = Math.min(1, Math.max(0, (p - .55) / .3));
-    const stats = [['TRADES', String(d.n)], ['WIN RATE', d.n ? Math.round(d.wins / d.n * 100) + '%' : '—'], ['PROFIT FACTOR', d.pf == null ? '—' : d.pf.toFixed(2)]];
+    const stats = [['TRADES', String(d.n)], ['WIN RATE', d.n ? Math.round(d.wins / d.n * 100) + '%' : '—'], ['PROFIT FACTOR', d.pf == null || !d.wins ? '—' : d.pf.toFixed(2)]];
     stats.forEach(([l, v], i) => { const x = 80 + i * 320; ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '500 24px "Geist Mono", monospace'; ctx.fillText(l, x, 1205); ctx.fillStyle = '#fff'; ctx.font = '500 58px Geist, system-ui, sans-serif'; ctx.fillText(v, x, 1270); });
     ctx.globalAlpha = 1; ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '500 22px "Geist Mono", monospace'; ctx.fillText('@KairosELY · journal, paper first', 80, 1316);
   }

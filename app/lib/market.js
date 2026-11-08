@@ -50,7 +50,7 @@ export async function getCandles(asset, limit = 48) {
 }
 
 /** Daily candles, oldest first (Coinbase, Kraken fallback). Used for the trend filter. `fresh` skips the cache. */
-export async function getDailyCandles(asset, limit = 60, { fresh = false } = {}) {
+export async function getDailyCandles(asset, limit = 60, { fresh = false, oneExchange = false } = {}) {
   if (!validAsset(asset)) throw new Error(`Invalid asset ${asset}`);
   if (mock) return (mock.daily?.[asset] || []).slice(-limit);
   const hit = cache.get('d:' + asset);
@@ -60,7 +60,7 @@ export async function getDailyCandles(asset, limit = 60, { fresh = false } = {})
   else try {
     const rows = await getJSON(`https://api.exchange.coinbase.com/products/${asset}/candles?granularity=86400`);
     v = rows.map(([t, low, high, open, close, volume]) => ({ t: t * 1000, open, high, low, close, volume })).sort((a, b) => a.t - b.t);
-  } catch { v = await K.ohlc(asset, 1440); }
+  } catch (e) { if (oneExchange) throw e; v = await K.ohlc(asset, 1440); } // the paper tracks never mix two exchanges' candles
   cache.set('d:' + asset, { t: Date.now(), v });
   return v.slice(-limit);
 }

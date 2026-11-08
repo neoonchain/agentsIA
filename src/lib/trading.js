@@ -172,8 +172,9 @@ export function evaluate(acc, rules, now = new Date()) {
     { key: 'min_trades', label: `Paper trades ≥ ${R('min_trades')}`, value: m.count, pass: m.count >= R('min_trades') },
     { key: 'min_days', label: `Days on paper ≥ ${R('min_days')}`, value: days, pass: days >= R('min_days') },
     { key: 'min_profit_factor', label: `Profit factor ≥ ${R('min_profit_factor')}`, value: m.profitFactor ?? 'n/a (no losses yet)', pass: m.profitFactor !== null && m.profitFactor >= R('min_profit_factor') },
-    { key: 'max_drawdown_pct', label: `Max drawdown ≤ ${R('max_drawdown_pct')}%`, value: m.maxDrawdownPct + '%', pass: m.maxDrawdownPct <= R('max_drawdown_pct') },
-    { key: 'min_adherence_pct', label: `Follows strategy ≥ ${R('min_adherence_pct')}%`, value: adherence + '%', pass: adherence >= R('min_adherence_pct') },
+    // with no trades yet nothing is proven: drawdown and adherence pass only once there is something to measure
+    { key: 'max_drawdown_pct', label: `Max drawdown ≤ ${R('max_drawdown_pct')}%`, value: m.count ? m.maxDrawdownPct + '%' : 'no trades yet', pass: m.count > 0 && m.maxDrawdownPct <= R('max_drawdown_pct') },
+    { key: 'min_adherence_pct', label: `Follows strategy ≥ ${R('min_adherence_pct')}%`, value: acc.proposals.total ? adherence + '%' : 'no decisions yet', pass: acc.proposals.total > 0 && adherence >= R('min_adherence_pct') },
     { key: 'net_profit', label: 'Net profit > 0', value: m.totalPnl, pass: m.totalPnl > 0 },
   ];
   return { metrics: m, days, adherence, checks, eligible: checks.every(c => c.pass) };

@@ -531,7 +531,7 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     try {
       const daily = {}, longGap = now - from > 90 * DAY; // after a long gap, fetch enough history for the 200-day average too
       for (const a of DIP_ASSETS) {
-        try { daily[a] = (longGap ? await getDailyRange(a, from - 260 * DAY) : await getDailyCandles(a, 300, { fresh: true })).filter(c => c.t <= lastDone); } catch { /* coin without data today */ }
+        try { daily[a] = (longGap ? await getDailyRange(a, from - 260 * DAY) : await getDailyCandles(a, 300, { fresh: true, oneExchange: true })).filter(c => c.t <= lastDone); } catch { /* coin without data today */ }
       }
       if (this.state.pullback) for (const a of PULLBACK_ASSETS) { // Nasdaq 100 and gold: Hyperliquid's own daily candles
         try { daily[a] = (longGap ? await getDailyRange(a, from - 320 * DAY) : await getDailyCandles(a, 400, { fresh: true })).filter(c => c.t <= lastDone); } catch { /* market without data today */ }
