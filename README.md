@@ -78,7 +78,12 @@ npm test
 ## Markets
 
 - **Coinbase and Kraken spot** (`BTC-USD`, `ETH-USD`, ...): prices, candles and the shock detector. Real money runs on Kraken spot.
-- **Hyperliquid perps** (`BTC-PERP`, `WIF-PERP`, `KPEPE-PERP`, ...): 170+ markets from HyperCore's public API, memecoins included, for **paper trading only** for now. `kPEPE` is 1,000 PEPE, as on Hyperliquid. Put these ids in a strategy's `assets` to paper trade them. Real money on HyperCore is planned through Kairos on Elysium, Kinetiq's Layer 2 for Hyperliquid, once its HyperCore trading upgrade ships. Until then, `enableLive` refuses `-PERP` strategies.
+- **Hyperliquid perps** (`BTC-PERP`, `WIF-PERP`, `KPEPE-PERP`, ...): 170+ markets from HyperCore's public API, memecoins included, for **paper trading only** for now.
+- **Traditional markets on Hyperliquid** through Trade.xyz (HIP-3), written `COIN-XYZ`: `XYZ100-XYZ` (Nasdaq 100), `SP500-XYZ`, `GOLD-XYZ`, `SILVER-XYZ`, `CL-XYZ` (oil), `TSLA-XYZ`, `NVDA-XYZ`, `EUR-XYZ` and 100+ more. Perps that trade 24/7, paper only for now. Their history is short (most start in late 2025). `kPEPE` is 1,000 PEPE, as on Hyperliquid. Put these ids in a strategy's `assets` to paper trade them. Real money on HyperCore is planned through Kairos on Elysium, Kinetiq's Layer 2 for Hyperliquid, once its HyperCore trading upgrade ships. Until then, `enableLive` refuses `-PERP` strategies.
+
+## Charts
+
+Every strategy page shows a chart (TradingView Lightweight Charts, Apache-2.0) of each market it trades, 1h or 1d, with the agent's entries and exits on it (green: the trade won, red: it lost), the entry, stop and target lines of open positions, and next to it the strategy's rules and every decision the agent took. Clicking a decision moves the chart to that day.
 
 ## Real money (Kraken)
 

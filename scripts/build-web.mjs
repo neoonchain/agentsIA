@@ -22,10 +22,12 @@ copy('src/web/boot.js', 'app/boot.js');
 copy('src/web/zip.js', 'app/zip.js');
 copy('src/public/app.js', 'app/app.js');
 copy('src/public/app.css', 'app/app.css');
+copy('src/public/lightweight-charts.js', 'app/lightweight-charts.js'); // TradingView Lightweight Charts (Apache-2.0)
 
 const importMap = { imports: Object.fromEntries(['fs', 'path', 'os', 'crypto', 'url'].map(m => [`node:${m}`, `./shims/${m}.js`])) };
 let html = fs.readFileSync(path.join(root, 'src/public/app.html'), 'utf8')
   .replace('href="/app.css"', 'href="./app.css"')
+  .replace('src="/lightweight-charts.js"', 'src="./lightweight-charts.js"')
   .replace('<script src="/app.js" type="module"></script>',
     `<script type="importmap">${JSON.stringify(importMap)}</script>\n<script>window.KAIROS_FREE_PROXY = ${JSON.stringify(freeProxy)};</script>\n<script src="./boot.js" type="module"></script>`);
 if (html.includes('/app.js')) throw new Error('app.html script tag not found');

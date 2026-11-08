@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { updateConfig, publicConfig } from './config.js';
 import * as V from './vault.js';
 import * as T from './trading.js';
-import { getPrice } from './market.js';
+import { getPrice, getCandles, getDailyCandles, validAsset } from './market.js';
 import { removeExamples, removeExampleState } from './examples.js';
 
 export const err = (status, message, code) => Object.assign(new Error(message), { status, code });
@@ -36,6 +36,9 @@ export function createApi(app) {
     ['PUT', /^\/api\/settings$/, async (_, b) => { app.setConfig(updateConfig(app.config, b)); return publicConfig(app.config); }],
     ['GET', /^\/api\/journal$/, async () => V.listJournal(app.vault)],
     ['POST', /^\/api\/journal$/, async (_, b) => ({ path: V.createJournalTrade(app.vault, b) })],
+    // candles for the strategy chart: tf 1h (last ~300 hours) or 1d (last ~300 days)
+    ['GET', /^\/api\/candles$/, async q => { const asset = String(q.get('asset') || ''), tf = q.get('tf') === '1h' ? '1h' : '1d', limit = Math.min(Number(q.get('limit')) || 300, 300);
+      if (!validAsset(asset)) throw err(400, 'Invalid asset'); return { asset, tf, candles: tf === '1h' ? await getCandles(asset, limit) : await getDailyCandles(asset, limit) }; }],
     ['GET', /^\/api\/track$/, async () => app.state.examples !== 'seeded' ? [] : [['track', 'Dip buyer'], ['trend', 'Trend rider']].filter(([k]) => app.state[k]).map(([k, name]) => { const t = app.state[k], d = app.state.decisions?.[name]?.find(x => x.track); return { name, lastDay: new Date(t.lastT).toISOString().slice(0, 10), outcome: d?.outcome || null, why: d ? d.thesis.split('\n')[0] : '', holding: Object.keys(t.pos) }; })],
     ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; removeExampleState(app.state); app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],

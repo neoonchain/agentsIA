@@ -4,7 +4,7 @@ const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // coin logos (assets/coin-*.webp); unknown tickers just show text
 const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT']);
-const coinBase = a => String(a || '').split('-')[0].toUpperCase();
+const coinBase = a => { const b = String(a || '').split('-')[0].toUpperCase(); return /^K[A-Z]{3,}$/.test(b) && COINS.has(b.slice(1)) ? b.slice(1) : b; };
 const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="../assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
 const withCoin = a => `<span class="wc">${coin(a)}${esc(a)}</span>`;
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -513,6 +513,54 @@ function chip(s) {
   return s.status === 'running' ? '<span class="chip run">running</span>' : '<span class="chip">stopped</span>';
 }
 
+/* ---------- the strategy chart (TradingView Lightweight Charts) with the agent's trades, its logic and its decisions ---------- */
+const chartPick = {}; // per strategy: { asset, tf, tab }
+function chartCard(s) {
+  const pick = chartPick[s.name] ||= { asset: s.assets[0], tf: s.timeframe === '1d' ? '1d' : '1h', tab: 'logic' };
+  if (!s.assets.includes(pick.asset)) pick.asset = s.assets[0];
+  const logic = String(s.body || '').replace(/^#\s+.*\n/, '').trim();
+  return `<div class="card chartcard" style="margin-top:16px">
+    <div class="cc-chart"><div class="row cc-bar"><div class="cc-assets">${s.assets.map(a => `<button class="chip cc-a ${a === pick.asset ? 'on' : ''}" data-asset="${esc(a)}">${withCoin(a)}</button>`).join('')}</div>
+      <div class="cc-tf">${['1h', '1d'].map(t => `<button class="chip ${t === pick.tf ? 'on' : ''}" data-tf="${t}">${t}</button>`).join('')}</div></div>
+      <div id="tvchart" class="cc-canvas"></div>
+      <p class="sub cc-legend">▲ entry: <span class="win">won</span> / <span class="sell">lost</span> / <span class="buy">open</span> · ▼ exit with its result · <span class="lim">●</span> buy limit placed · dashed lines: entry, stop and target of an open position · chart by <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a></p></div>
+    <div class="cc-side"><div class="row cc-tabs"><button class="chip ${pick.tab === 'logic' ? 'on' : ''}" data-tab="logic">Logic</button><button class="chip ${pick.tab === 'dec' ? 'on' : ''}" data-tab="dec">Decisions</button></div>
+      <div class="cc-pane md" ${pick.tab === 'logic' ? '' : 'hidden'} data-pane="logic">${md(logic || 'This strategy has no written rules yet.')}</div>
+      <div class="cc-pane" ${pick.tab === 'dec' ? '' : 'hidden'} data-pane="dec">${(s.decisions || []).length ? s.decisions.map(d => `<div class="cc-d ${esc(d.outcome)}" data-at="${esc(d.at)}" data-asset="${esc(d.asset || '')}"><span class="mono">${esc(new Date(d.at).toISOString().slice(0, 10))}</span><b>${esc(({ opened: 'Bought', closed: 'Sold', order: 'Buy limit', hold: 'Hold', blocked: 'Blocked', 'stop moved': 'Stop moved' })[d.outcome] || d.outcome)}${d.asset && d.outcome !== 'hold' ? ' · ' + esc(d.asset.split('-')[0]) : ''}</b><p>${esc(String(d.thesis || '').split('\n')[0].slice(0, 170))}</p></div>`).join('') : '<p class="empty">No decisions yet. Start the strategy on paper, or run one decision.</p>'}</div></div></div>`;
+}
+async function mountChart(s) {
+  const el = document.getElementById('tvchart'), card = el && el.closest('.chartcard'), LW = window.LightweightCharts;
+  if (!el || !LW) { if (el) el.innerHTML = '<p class="empty">Chart unavailable.</p>'; return; }
+  const pick = chartPick[s.name];
+  card.querySelectorAll('[data-asset].cc-a').forEach(b => b.onclick = () => { pick.asset = b.dataset.asset; renderStrategy(s.name); });
+  card.querySelectorAll('[data-tf]').forEach(b => b.onclick = () => { pick.tf = b.dataset.tf; renderStrategy(s.name); });
+  card.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { pick.tab = b.dataset.tab; card.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('on', x === b)); card.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== pick.tab); });
+  const dark = document.documentElement.dataset.theme === 'dark', css = getComputedStyle(document.documentElement);
+  const chart = LW.createChart(el, { autoSize: true, layout: { background: { color: 'transparent' }, textColor: dark ? '#b6bac4' : '#40455f', fontFamily: 'Geist, sans-serif' },
+    grid: { vertLines: { color: dark ? '#33363c' : '#eef0f3' }, horzLines: { color: dark ? '#33363c' : '#eef0f3' } }, rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, timeVisible: pick.tf === '1h' } });
+  const series = chart.addCandlestickSeries({ upColor: '#22c58b', downColor: '#f0503c', wickUpColor: '#22c58b', wickDownColor: '#f0503c', borderVisible: false });
+  let candles = [];
+  try { candles = (await api(`/candles?asset=${encodeURIComponent(pick.asset)}&tf=${pick.tf}&limit=300`)).candles; } catch (e) { el.innerHTML = `<p class="empty">${esc(e.message)}</p>`; return; }
+  if (!candles.length) { el.innerHTML = '<p class="empty">No candles for this market yet.</p>'; return; }
+  const step = pick.tf === '1h' ? 3600 : 86400, bucket = ms => Math.floor(ms / 1000 / step) * step, first = bucket(candles[0].t), last = bucket(candles.at(-1).t);
+  series.setData(candles.map(c => ({ time: bucket(c.t), open: c.open, high: c.high, low: c.low, close: c.close })));
+  // the agent's trades on this market: paper account, the paper track in the journal, and its recent decisions
+  const marks = [], seen = new Set(), add = (ms, kind, text) => { const t = bucket(ms); if (t < first || t > last) return; const k = t + kind; if (seen.has(k)) return; seen.add(k);
+    // entries: an arrow coloured by how the trade ended (blue while open or unknown); exits carry the result
+    marks.push(kind === 'buy' ? { time: t, position: 'belowBar', color: text === 'win' ? '#22c58b' : text === 'loss' ? '#f0503c' : '#0055ff', shape: 'arrowUp', text: '' } : kind === 'sell' ? { time: t, position: 'aboveBar', color: text.startsWith('+') ? '#22c58b' : '#f0503c', shape: 'arrowDown', text } : { time: t, position: 'belowBar', color: '#2a9dc4', shape: 'circle', text: '' }); };
+  const short = n => (n >= 0 ? '+' : '−') + '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+  for (const t of s.account.trades.filter(t => t.asset === pick.asset)) { add(Date.parse(t.openedAt), 'buy', t.pnl > 0 ? 'win' : 'loss'); add(Date.parse(t.closedAt), 'sell', short(t.pnl)); }
+  for (const d of (s.decisions || []).filter(d => d.asset === pick.asset)) { const at = Date.parse(d.at) - (pick.tf === '1d' ? 86400000 : 0); if (d.outcome === 'opened') add(at, 'buy', 'open'); else if (d.outcome === 'closed') add(at, 'sell', d.pnl != null ? short(d.pnl) : 'Sell'); else if (d.outcome === 'order') add(at, 'limit', ''); }
+  try { for (const t of (await api('/journal')).filter(t => t.strategy === s.name && t.asset === pick.asset)) { const ds = String(t.date); add(Date.parse(/T|Z$/.test(ds) ? ds : ds.replace(' ', 'T') + 'Z'), 'buy', t.pnl > 0 ? 'win' : 'loss'); } } catch { /* journal unavailable */ }
+  series.setMarkers(marks.sort((a, b) => a.time - b.time));
+  const open = s.account.positions[pick.asset];
+  if (open) [['Entry', open.entry, '#0055ff'], ['Stop', open.stop, '#f0503c'], ['Target', open.takeProfit, '#22c58b']].forEach(([title, price, color]) => { if (Number.isFinite(price)) series.createPriceLine({ price, color, lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title }); });
+  chart.timeScale().fitContent();
+  // clicking a decision moves the chart to that day
+  card.querySelectorAll('.cc-d').forEach(d => d.onclick = () => { if (d.dataset.asset && d.dataset.asset !== pick.asset && s.assets.includes(d.dataset.asset)) { pick.asset = d.dataset.asset; pick.tab = 'dec'; return renderStrategy(s.name); }
+    const t = bucket(Date.parse(d.dataset.at)), span = step * 40; chart.timeScale().setVisibleRange({ from: t - span, to: t + span / 2 }); card.querySelectorAll('.cc-d').forEach(x => x.classList.toggle('on', x === d)); });
+}
+
 /* ---------- how the AI decided: every decision, step by step ---------- */
 const openDecisions = new Set();
 function decisionsCard(s, running) {
@@ -571,6 +619,7 @@ async function renderStrategy(name) {
         <div class="stat"><span class="eyebrow">Closed trades</span><div class="n">${m.count}</div></div>
         <div class="stat"><span class="eyebrow">PnL</span><div class="n ${cls(m.totalPnl)}">${money(m.totalPnl)}</div></div>
         <div class="stat"><span class="eyebrow">Max drawdown</span><div class="n">${m.maxDrawdownPct}%</div></div></div></div>
+    ${chartCard(s)}
     <div id="decision"></div>
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><h3>Your marks</h3><div class="checks" style="margin-top:8px">${ev.checks.map(c => `<div class="c ${c.pass ? 'pass' : 'fail'}"><span>${esc(c.label)}</span><span>${esc(c.value)} ${c.pass ? '✓' : '✗'}</span></div>`).join('')}</div>
@@ -585,6 +634,7 @@ async function renderStrategy(name) {
       ${s.lessons?.length ? s.lessons.map(l => `<div class="lesson ${/· -/.test(l.title) ? 'loss' : 'win'}"><b class="mono">${esc(l.title)}</b><ul>${l.lines.filter(x => !x.startsWith('Thesis')).map(x => `<li>${md(x).replace(/<\/?p>/g, '')}</li>`).join('')}</ul></div>`).join('') : '<p class="empty">No closed trades yet. Each one will leave a lesson here.</p>'}</div>
     <div class="card" style="margin-top:16px"><h3>Closed paper trades</h3>${a.trades.length ? `<div class="tblwrap"><table style="margin-top:8px"><tr><th>Closed</th><th>Asset</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL</th><th>R</th><th>Reason</th><th>Models</th></tr>
       ${a.trades.slice().reverse().map(t => `<tr class="click" data-note="${esc(t.notePath || '')}"><td class="num">${esc(String(t.closedAt).slice(0, 16).replace('T', ' '))}</td><td>${withCoin(t.asset)}</td><td>${esc(t.side)}</td><td class="num">${fp(t.entry)}</td><td class="num">${fp(t.exit)}</td><td class="num ${cls(t.pnl)}">${money(t.pnl)}</td><td class="num ${cls(t.r)}">${t.r}</td><td>${esc(t.reason)}</td><td class="sub">${esc([t.proposer, t.reviewer].filter(Boolean).join(' + '))}</td></tr>`).join('')}</table></div>` : '<p class="empty">No closed trades yet.</p>'}</div>`;
+  mountChart(s);
   // keep opened decisions open across refreshes; refresh every minute while the strategy runs
   box.querySelectorAll('details.dec').forEach(d => { if (openDecisions.has(d.dataset.at)) d.open = true; d.ontoggle = () => { d.open ? openDecisions.add(d.dataset.at) : openDecisions.delete(d.dataset.at); }; });
   clearInterval(window.__decTimer);

@@ -18,6 +18,7 @@ const STATIC = {
   '/app/': [path.join(here, 'public', 'app.html'), 'text/html'],
   '/app.js': [path.join(here, 'public', 'app.js'), 'text/javascript'],
   '/app.css': [path.join(here, 'public', 'app.css'), 'text/css'],
+  '/lightweight-charts.js': [path.join(here, 'public', 'lightweight-charts.js'), 'text/javascript'],
 };
 
 async function readBody(req) {

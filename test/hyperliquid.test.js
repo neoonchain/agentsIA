@@ -18,8 +18,8 @@ function fakeHyperliquid() {
   globalThis.fetch = async (url, opts) => {
     if (!String(url).includes('hyperliquid')) return realFetch(url, opts);
     const body = JSON.parse(opts.body); calls.push(body.type);
-    const json = body.type === 'meta' ? { universe: [{ name: 'BTC' }, { name: 'kPEPE' }, { name: 'OLD', isDelisted: true }] }
-      : body.type === 'allMids' ? { BTC: '76000.5', kPEPE: '0.00507' }
+    const json = body.type === 'meta' ? (body.dex === 'xyz' ? { universe: [{ name: 'xyz:GOLD' }, { name: 'xyz:XYZ100' }] } : { universe: [{ name: 'BTC' }, { name: 'kPEPE' }, { name: 'OLD', isDelisted: true }] })
+      : body.type === 'allMids' ? (body.dex === 'xyz' ? { 'xyz:GOLD': '4059.6', 'xyz:XYZ100': '26931.5' } : { BTC: '76000.5', kPEPE: '0.00507' })
       : body.type === 'candleSnapshot' ? Array.from({ length: 10 }, (_, i) => ({ t: 1000 + i, o: '1', h: '2', l: '0.5', c: String(1 + i / 10), v: '100' }))
       : body.type === 'fundingHistory' ? [{ time: 1, fundingRate: '0.0000125' }] : null;
     return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -30,8 +30,10 @@ test('Hyperliquid perps: COIN-PERP ids map to Hyperliquid coins, prices and cand
   fakeHyperliquid();
   try {
     assert.equal(HL.isPerp('BTC-PERP'), true); assert.equal(HL.isPerp('BTC-USD'), false);
-    assert.deepEqual(await HL.listPerps(), ['BTC-PERP', 'KPEPE-PERP']); // delisted markets are left out
-    assert.equal(await HL.coinOf('KPEPE-PERP'), 'kPEPE');
+    assert.deepEqual(await HL.listPerps(), ['BTC-PERP', 'KPEPE-PERP', 'GOLD-XYZ', 'XYZ100-XYZ']); // delisted markets are left out
+    assert.equal(await HL.coinOf('KPEPE-PERP'), 'kPEPE'); assert.equal(await HL.coinOf('GOLD-XYZ'), 'xyz:GOLD');
+    assert.equal(HL.isPerp('XYZ100-XYZ'), true); assert.equal(M.validAsset('XYZ100-XYZ'), true);
+    assert.equal(await M.getPrice('GOLD-XYZ'), 4059.6); // Nasdaq, gold and the rest come from Trade.xyz (HIP-3)
     await assert.rejects(HL.coinOf('NOPE-PERP'), /not listed on Hyperliquid/);
     assert.equal(await M.getPrice('KPEPE-PERP'), 0.00507);
     const c = await M.getCandles('BTC-PERP', 5);
