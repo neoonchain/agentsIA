@@ -49,7 +49,7 @@ html.loading #loader{display:block}
 .top.solid{background:rgba(255,255,255,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding-top:12px;padding-bottom:12px}
 .menu-open .top.solid{background:transparent;backdrop-filter:none}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:22px;letter-spacing:-.03em;transition:color .4s}
-.brand svg{width:28px;height:28px}
+.brand svg,.brand .mk{width:28px;height:28px;display:block}
 .top-r{display:flex;gap:10px;align-items:center}
 .pill{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 22px;border-radius:999px;font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;transition:background .35s,color .35s,transform .5s var(--ease)}
 .pill.sky{background:var(--sky);color:var(--ink)}.pill.sky:hover{background:var(--ink);color:#fff}
@@ -201,7 +201,7 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
 .f-cols a:hover{color:var(--blue)}
 .f-cols{position:relative;z-index:1}
 .word{pointer-events:none;font-size:clamp(90px,27.5vw,460px);font-weight:600;letter-spacing:-.075em;line-height:.78;display:flex;align-items:flex-end;gap:.04em;user-select:none}
-.word svg{width:.62em;height:.62em;flex:none;margin-bottom:.03em}
+.word svg,.word .mk{width:.62em;height:.62em;flex:none;margin-bottom:.03em}
 .f-bot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:26px;color:var(--mute-2)}
 
 /* cursor + reveal */
@@ -233,7 +233,7 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
 <div id="loader" aria-hidden="true"><canvas class="pix" data-mode="foot"></canvas><div class="n" id="ldN">0</div><div class="tag lbl">Kairos<br><b>The right moment</b></div><div class="bar" id="ldB"></div></div>
 
 <header class="top" id="top">
-  <a class="brand" href="./" aria-label="Kairos home"><svg><use href="#mark"/></svg>kairos</a>
+  <a class="brand" href="./" aria-label="Kairos home"><img class="mk" src="assets/kai-mark.png" alt="" width="28" height="28">kairos</a>
   <div class="top-r"><a class="xlink" href="https://x.com/KairosELY" target="_blank" rel="noopener noreferrer" aria-label="Kairos on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a><a class="pill sky" href="app/"><span class="dot"></span>Enter app</a><button class="mbtn" id="mbtn" aria-label="Menu" aria-expanded="false"><span><i></i><i></i></span></button></div>
 </header>
 <div id="menu" aria-hidden="true">
@@ -345,7 +345,7 @@ footer{padding:clamp(60px,9vh,100px) var(--g) 26px}
     <div><h6>PROOF</h6><a href="tour#record">Track record</a><a href="tour#rules">Rules</a><a href="tour#money">Risk warning</a></div>
     <div><h6>START</h6><a href="app/">Enter the app</a><a href="#dock">Keep it in your Dock</a><a href="tour#get">Download</a></div>
   </div>
-  <div class="word" aria-hidden="true"><svg><use href="#mark"/></svg>kairos</div>
+  <div class="word" aria-hidden="true"><img class="mk" src="assets/kai-mark.png" alt="" width="200" height="200">kairos</div>
   <div class="f-bot lbl"><span>© 2026 Kairos</span><span>Local-first · paper before real</span></div>
 </footer>
 

@@ -784,8 +784,8 @@ function openShare(trades, month){
     </div></div>`;
   $('#dlg').showModal();
   const cv = $('#shareCv'), ctx = cv.getContext('2d'), W = 1080, H = 1350;
-  const vb = document.querySelector('.brand svg')?.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, 32, 32];
-  const markD = document.querySelector('.brand svg path')?.getAttribute('d');
+  const vb = document.querySelector('#kaiVector')?.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, 32, 32];
+  const markD = document.querySelector('#kaiVector path')?.getAttribute('d');
   const data = () => { const ts = trades.filter(t => st.period === 'all' || String(t.date).startsWith(st.period)).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const pnl = ts.reduce((a, t) => a + t.pnl, 0), r = ts.reduce((a, t) => a + (+t.r || 0), 0), w = ts.filter(t => t.pnl > 0).length, gl = -ts.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0), gp = ts.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
     let c = 0; const curve = [0, ...ts.map(t => (c += t.pnl))];

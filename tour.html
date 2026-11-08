@@ -36,7 +36,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .nav{position:sticky;top:0;z-index:50;height:var(--nav);background:rgba(255,255,255,.92);backdrop-filter:blur(8px)}
 .nav .wrap{height:100%;display:flex;align-items:center;gap:24px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:24px;letter-spacing:-.03em}
-.brand svg{width:30px;height:30px}
+.brand svg,.brand .mk{width:30px;height:30px;display:block}
 .nav-links{display:flex;gap:clamp(18px,2.6vw,40px);margin-left:clamp(10px,2.2vw,34px);white-space:nowrap}
 .nav-links a{font-family:var(--mono);font-size:11.5px;letter-spacing:.24em;color:var(--ink-2)}
 .nav-links a:hover{color:var(--ink)}
@@ -248,7 +248,7 @@ section.sec{padding:130px 0 0}
 /* FOOTER */
 footer{margin-top:120px;border-top:1px solid var(--line)}
 .f-top{display:grid;grid-template-columns:1fr 268px 280px;padding-top:118px;padding-bottom:40px}
-.f-top .brand{font-size:30px;margin-bottom:28px}.f-top .brand svg{width:36px;height:36px}
+.f-top .brand{font-size:30px;margin-bottom:28px}.f-top .brand svg,.f-top .brand .mk{width:36px;height:36px}
 .f-top p{font-size:17px;line-height:1.6;color:var(--mute);max-width:380px}
 .f-col h6{font-family:var(--mono);font-size:11px;font-weight:400;letter-spacing:.24em;color:var(--mute-2);margin:6px 0 26px}
 .f-col a{display:block;font-size:16px;margin-bottom:16px}
@@ -540,7 +540,7 @@ try{if(!sessionStorage.getItem('kairos-intro')&&!matchMedia('(prefers-reduced-mo
 
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="./"><svg><use href="#mark"/></svg>kairos</a>
+    <a class="brand" href="./"><img class="mk" src="assets/kai-mark.png" alt="" width="30" height="30">kairos</a>
     <nav class="nav-links">
       <a href="#vault">THE VAULT</a><a href="#agents">AGENTS</a><a href="#rules">RULES</a><a href="#record">RECORD</a><a href="#memecoins">MEMECOINS</a><a href="#news">ARGUS</a>
     </nav>
@@ -916,7 +916,7 @@ try{if(!sessionStorage.getItem('kairos-intro')&&!matchMedia('(prefers-reduced-mo
 
 <footer>
   <div class="wrap f-top">
-    <div><a class="brand" href="./"><svg><use href="#mark"/></svg>kairos</a><p>A local trading journal in Obsidian, and AI agents that have to earn your money on paper before they ever touch it for real.</p></div>
+    <div><a class="brand" href="./"><img class="mk" src="assets/kai-mark.png" alt="" width="30" height="30">kairos</a><p>A local trading journal in Obsidian, and AI agents that have to earn your money on paper before they ever touch it for real.</p></div>
     <div class="f-col"><h6>SITEMAP</h6><a href="#vault">The vault</a><a href="#agents">Agents</a><a href="#guard">Promotion</a><a href="#rules">Rules</a><a href="#memecoins">Memecoins</a><a href="#news">Argus</a><a href="#league">The team</a></div>
     <div class="f-col"><h6>GET STARTED</h6><a href="app/">Open the journal template</a><a href="https://github.com/neoonchain/agentsIA#readme" target="_blank" rel="noopener noreferrer">Documentation</a><a href="app/">Connect a paper broker</a><a href="#league">Supported models</a><a href="#money">Risk warning</a></div>
   </div>
