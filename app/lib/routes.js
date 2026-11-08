@@ -44,7 +44,7 @@ export function createApi(app) {
     ['POST', /^\/api\/auth\/nonce$/, async () => app.authNonce()],
     ['POST', /^\/api\/auth\/verify$/, async (_, b) => app.authVerify(b)],
     ['POST', /^\/api\/auth\/logout$/, async () => app.logout()],
-    ['GET', /^\/api\/track$/, async () => app.state.examples !== 'seeded' ? [] : [['track', 'Dip buyer'], ['trend', 'Trend rider']].filter(([k]) => app.state[k]).map(([k, name]) => { const t = app.state[k], d = app.state.decisions?.[name]?.find(x => x.track); return { name, lastDay: new Date(t.lastT).toISOString().slice(0, 10), outcome: d?.outcome || null, why: d ? d.thesis.split('\n')[0] : '', holding: Object.keys(t.pos) }; })],
+    ['GET', /^\/api\/track$/, async () => app.state.examples !== 'seeded' ? [] : [['track', 'Dip buyer'], ['trend', 'Trend rider'], ['pullback', 'Pullback']].filter(([k]) => app.state[k]).map(([k, name]) => { const t = app.state[k], d = app.state.decisions?.[name]?.find(x => x.track); return { name, lastDay: new Date(t.lastT).toISOString().slice(0, 10), outcome: d?.outcome || null, why: d ? d.thesis.split('\n')[0] : '', holding: Object.keys(t.pos) }; })],
     ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; removeExampleState(app.state); app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
     ['GET', /^\/api\/news$/, async () => ({ items: app.news.items.slice(0, 120), shocks: app.news.shocks.slice(0, 30), status: app.news.status, watch: app.watchedAssets(),

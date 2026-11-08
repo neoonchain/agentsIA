@@ -1,13 +1,16 @@
 // Example journal: the paper tracks of the two strategies Kairos ships with, on real Coinbase daily prices
-// (Dip buyer and Trend rider, $5,000 each, the last two years, continued every day by the app).
+// (Dip buyer and Trend rider, $5,000 each, the last two years; Pullback on Nasdaq 100 and gold since Hyperliquid listed them;
+// continued every day by the app).
 // Seeded into an empty vault so a new user sees what a filled journal looks like. All tagged "example",
 // removable in one click; every paper test (wins and losses) stays on the Track record.
 import fs from 'node:fs';
 import * as V from './vault.js';
 import { TRACK, TRACK_STATE, TRACK_DECISIONS } from './examples-dip.js';
 import { TREND_TRACK, TREND_STATE, TREND_DECISIONS } from './examples-trend.js';
+import { PULLBACK_TRACK, PULLBACK_STATE, PULLBACK_DECISIONS } from './examples-pullback.js';
 import { trackJournalEntry } from './dipbuyer.js';
 import { trendJournalEntry } from './trendrider.js';
+import { pullbackJournalEntry } from './pullback.js';
 
 export const EXAMPLE_TAG = 'example';
 
@@ -24,13 +27,20 @@ export function trendTrades() {
     ...trendJournalEntry({ asset, t: Date.parse(opened), entry, stop, exit, qty, pnl, r, why, days, ctx }), chart: `trend-${String(k + 1).padStart(3, '0')}.webp`,
   }));
 }
-const allTrackTrades = () => [...trackTrades(), ...trendTrades()];
+export function pullbackTrades() {
+  return PULLBACK_TRACK.map(([asset, opened, closed, entry, stop, exit, qty, pnl, r, why, days, fees, ctx], k) => ({
+    ...pullbackJournalEntry({ asset, t: Date.parse(opened), entry, stop, exit, qty, pnl, r, why, days, fees, ctx }), chart: `pullback-${String(k + 1).padStart(3, '0')}.webp`,
+  }));
+}
+const allTrackTrades = () => [...trackTrades(), ...trendTrades(), ...pullbackTrades()];
 const copy = x => JSON.parse(JSON.stringify(x));
 function startTracks(state) {
   state.track = copy(TRACK_STATE); state.trend = copy(TREND_STATE);
   const d = state.decisions ||= {};
   d['Dip buyer'] = copy(TRACK_DECISIONS); d['Trend rider'] = copy(TREND_DECISIONS);
+  startPullback(state);
 }
+function startPullback(state) { state.pullback = copy(PULLBACK_STATE); (state.decisions ||= {}).Pullback = copy(PULLBACK_DECISIONS); }
 
 /** Seed the examples once, into a journal that has never had any trades. Vaults seeded by an older version move to v4:
  *  their example trades are replaced by the two tracks (your own trades are never touched). */
@@ -39,19 +49,23 @@ export function seedExamples(root, state) {
     state.examples = V.listJournal(root).length ? 'skipped' : 'seeded';
     if (state.examples !== 'seeded') return false;
     for (const t of allTrackTrades()) V.createJournalTrade(root, t);
-    state.examplesVersion = 4; startTracks(state); return true;
+    state.examplesVersion = 5; startTracks(state); return true;
+  }
+  if (state.examples === 'seeded' && state.examplesVersion === 4) { // v5 adds the Pullback track next to the two others
+    for (const t of pullbackTrades()) V.createJournalTrade(root, t);
+    state.examplesVersion = 5; startPullback(state); return true;
   }
   if (state.examples === 'seeded' && (state.examplesVersion || 1) < 4) {
     removeExamples(root);
     for (const t of allTrackTrades()) V.createJournalTrade(root, t);
-    state.examplesVersion = 4; startTracks(state); return true;
+    state.examplesVersion = 5; startTracks(state); return true;
   }
   return false;
 }
 
 /** Remove the example trades and stop the tracks, with their example decisions. */
 export function removeExampleState(state) {
-  delete state.track; delete state.trend;
+  delete state.track; delete state.trend; delete state.pullback;
   for (const [k, ds] of Object.entries(state.decisions || {})) { state.decisions[k] = ds.filter(d => !d.example); if (!state.decisions[k].length) delete state.decisions[k]; }
 }
 

@@ -11,6 +11,7 @@ import * as L from './live.js';
 import { seedExamples, attachExampleCharts } from './examples.js';
 import { dailyReadings, readingsText, stepTrack, trackJournalEntry, trackDecision, DIP_ASSETS, DAY } from './dipbuyer.js';
 import { stepTrend, trendDecision, trendJournalEntry, trendReadings } from './trendrider.js';
+import { stepPullback, pullbackDecision, pullbackJournalEntry, pullbackReadings, PULLBACK_ASSETS } from './pullback.js';
 import { isPerp } from './hyperliquid.js';
 import { marketName } from './markets.js';
 import * as W from './wallet.js';
@@ -257,7 +258,7 @@ export class App {
         if (s.trend_filter === true) { try { const t = dailyTrend(await getDailyCandles(a, 60), prices[a]); if (t) trend[a] = t; } catch { /* no daily data: Brake can't judge the trend */ } }
       }
       let readings = null; // daily strategies: the rule numbers, computed by code
-      if (s.timeframe === '1d') { try { const d = {}; for (const a of new Set(['BTC-USD', ...s.assets])) d[a] = await getDailyCandles(a, 300); readings = s.rules_engine === 'trend-rider' ? trendReadings(d) : readingsText(dailyReadings(d)); } catch { /* no daily data */ } }
+      if (s.timeframe === '1d') { try { const d = {}; for (const a of new Set(['BTC-USD', ...s.assets])) d[a] = await getDailyCandles(a, 300); readings = s.rules_engine === 'trend-rider' ? trendReadings(d) : s.rules_engine === 'pullback' ? pullbackReadings(d) : readingsText(dailyReadings(d)); } catch { /* no daily data */ } }
       T.trackExcursion(acc, prices);
       if (live) { const rs = L.liveRiskState(live, prices, rules); if (rs) await this.handleLiveRisk(s, live, rs); }
       else for (const ev of T.riskTick(acc, prices, rules)) this.handleRiskEvent(s, ev);
@@ -514,11 +515,12 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
   }
 
   /* ---------- scheduler: exits every tick, decisions on each strategy's interval ---------- */
-  /** The paper tracks in the example journal (Dip buyer and Trend rider): run their rules on every newly closed day. */
+  /** The paper tracks in the example journal (Dip buyer, Trend rider, Pullback): run their rules on every newly closed day. */
   async trackTick(now = Date.now()) {
     const tracks = [
       ['track', 'Dip buyer', stepTrack, trackDecision, trackJournalEntry],
       ['trend', 'Trend rider', stepTrend, trendDecision, trendJournalEntry],
+      ['pullback', 'Pullback', stepPullback, pullbackDecision, pullbackJournalEntry],
     ].filter(([k]) => this.state[k]);
     if (!tracks.length || this.state.examples !== 'seeded' || this.trackBusy) return [];
     const lastDone = Math.floor(now / DAY) * DAY - DAY; // the last daily candle that has closed
@@ -530,6 +532,9 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
       const daily = {}, longGap = now - from > 90 * DAY; // after a long gap, fetch enough history for the 200-day average too
       for (const a of DIP_ASSETS) {
         try { daily[a] = (longGap ? await getDailyRange(a, from - 260 * DAY) : await getDailyCandles(a, 300, { fresh: true })).filter(c => c.t <= lastDone); } catch { /* coin without data today */ }
+      }
+      if (this.state.pullback) for (const a of PULLBACK_ASSETS) { // Nasdaq 100 and gold: Hyperliquid's own daily candles
+        try { daily[a] = (longGap ? await getDailyRange(a, from - 320 * DAY) : await getDailyCandles(a, 400, { fresh: true })).filter(c => c.t <= lastDone); } catch { /* market without data today */ }
       }
       if (!daily['BTC-USD']?.some(c => c.t === lastDone)) return []; // the exchange has not published yesterday's candle yet
       const have = new Set(V.listJournal(this.vault).map(t => `${String(t.date).slice(0, 10)}|${t.asset}|${t.strategy}`)), added = [];

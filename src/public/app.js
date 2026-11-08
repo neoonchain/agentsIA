@@ -154,7 +154,7 @@ function go(v) { current = v; location.hash = v; render(true); }
 const views = {
   /** Notice shown while the example trades are in the journal. */
   examplesBanner(n, own = 0) {
-    return n ? `<div class="banner info ex-banner"><span>${own ? `<b>Your numbers.</b> The stats count your ${own} trade${own > 1 ? 's' : ''} only; the ${n} example trades stay in the list below until you remove them.` : `<b>${n} example trades:</b> the paper tracks of Dip buyer and Trend rider, $5,000 each, their rules on real daily prices for the last two years and updated every day. Once you log a trade, the stats count yours only.`}</span><button class="btn sm" id="rmExamples">Remove examples</button></div>` : '';
+    return n ? `<div class="banner info ex-banner"><span>${own ? `<b>Your numbers.</b> The stats count your ${own} trade${own > 1 ? 's' : ''} only; the ${n} example trades stay in the list below until you remove them.` : `<b>${n} example trades:</b> the paper tracks of Dip buyer and Trend rider (crypto, the last two years) and Pullback (Nasdaq 100 and gold on Hyperliquid, since they listed), $5,000 each, their rules on real daily prices and updated every day. Once you log a trade, the stats count yours only.`}</span><button class="btn sm" id="rmExamples">Remove examples</button></div>` : '';
   },
 
   async overview() {
@@ -223,7 +223,7 @@ const views = {
       <div class="head"><div><h1>Journal</h1><p>Every trade is a note in <span class="mono">Trades/</span> with its screenshot in <span class="mono">Attachments/</span>. Obsidian shows both; Analyse lets the models look at your charts.</p></div>
         <div class="row">${trades.length ? '<button class="btn" id="sharePnl">Share PnL ↗</button>' : ''}<button class="btn dark" id="newTrade">${trades.length ? 'Log a trade' : 'Log your first trade'}</button></div></div>
       ${views.examplesBanner(listed.length - own.length, own.length)}
-      ${(track || []).map(tr => `<div class="banner track-line"><span class="dot ${tr.outcome === 'hold' ? '' : 'on'}"></span><span><b>${esc(tr.name)} paper track</b> · checked every daily close, last on ${esc(new Date(tr.lastDay + 'T00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }))}: ${esc(tr.why)}${tr.holding.length ? ` Holding ${esc(tr.holding.map(a => a.split('-')[0]).join(', '))}.` : ''} <span class="lnk" role="link" tabindex="0" data-strat="${esc(tr.name)}">See every day →</span></span></div>`).join('')}
+      ${(track || []).map(tr => `<div class="banner track-line"><span class="dot ${tr.outcome === 'hold' ? '' : 'on'}"></span><span><b>${esc(tr.name)} paper track</b> · checked every daily close, last on ${esc(new Date(tr.lastDay + 'T00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }))}: ${esc(tr.why)}${tr.holding.length ? ` Holding ${esc(tr.holding.map(a => marketName(a)).join(', '))}.` : ''} <span class="lnk" role="link" tabindex="0" data-strat="${esc(tr.name)}">See every day →</span></span></div>`).join('')}
       <div class="jstats">
         <div class="jcurve card"><div class="row" style="justify-content:space-between"><span class="eyebrow">Cumulative PnL</span><span class="num ${cls(acc)}">${money(acc)}</span></div>
           ${trades.length > 1 ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="jg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${acc >= 0 ? '#0055ff' : '#ef4423'}" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>

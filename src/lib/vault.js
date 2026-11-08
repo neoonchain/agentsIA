@@ -221,6 +221,60 @@ What paper test 10 taught it (8 coins, daily candles, Jan 2019 to Nov 2026).
 - It needs strong markets. With BTC flat over the last two years it still made money because single coins (ADA, XRP, DOGE) trended hard.
 `;
 
+const PULLBACK_STRATEGY = `---
+name: Pullback
+status: stopped
+version: 1
+rules_engine: pullback
+assets: [XYZ100-XYZ, GOLD-XYZ]
+timeframe: 1d
+risk_per_trade_pct: 3
+hours_utc: "00:00-23:59"
+interval_min: 240
+max_positions: 2
+trend_filter: false
+---
+
+# Pullback
+
+Buy a short dip in the Nasdaq 100 or gold while its long trend is up, and sell into the bounce. Paper only (Trade.xyz on Hyperliquid).
+Larry Connors' "Double 7s", unchanged, with a safety stop. Picked from 14 classic rule sets (Paul Tudor Jones, Connors, Raschke, the Turtles, AQR's 12-month momentum, the 50/200 cross) tested on 2001-2026 after fees and Hyperliquid funding. Three made money on both markets in both halves; the other two trade once or twice a year and fell 30-41% from the top. This one trades about 15 times a year, wins about 7 in 10 and fell 11-19% at most with its safety stop.
+Its paper track is in the journal (tag #pullback). Rules are fixed in code (src/lib/pullback.js).
+
+## Trend first
+- Buy only while the market closes above its 200-day average (weekday closes, like the index itself).
+- Read the latest headlines (Argus): skip the entry before a Fed decision, CPI or a big earnings week for the Nasdaq.
+
+## Entry
+- The market closes at or under its lowest close of the previous 7 days. Buy at the next open.
+- Size so the safety stop risks 3% of the account: stop 8% under entry for the Nasdaq 100, 6% for gold.
+
+## Exit
+- Sell at the next open after a close at or over the highest close of the previous 7 days.
+- Safety stop, intraday. No target, no time stop: the bounce decides.
+
+## Discipline
+- Holding costs money: Hyperliquid funding on longs was about 5.4% a year on the Nasdaq 100 and 8.4% on gold in their first year. The trade must bounce within days.
+- Expect small wins (about 2% each) and few, larger stops. Most of the edge is the win rate, so never skip the exit rule.
+`;
+
+const PULLBACK_LESSONS = `---
+strategy: Pullback
+tags: [lessons]
+---
+
+# Lessons · Pullback
+
+What the research taught it (Nasdaq 100 index and gold futures, daily, 2001-2026, 0.08% costs each way plus funding).
+
+- Funding decides what works. Trend following (200-day rule, Turtles, 12-month momentum, 50/200 cross) makes money on the index itself but holds 65-85% of the time, and 5-8% a year of funding takes most of it.
+- Short dips work better than long trends here: in the market only about 30% of the time, so funding stays small.
+- Double 7s made money on both markets in 2001-2014 and again in 2015-2026 (profit factor 1.1-1.7, 63-73% of trades won). Every lookback from 6 to 10 days stayed profitable in both periods (6 barely, on gold); 7 is Connors' original, not a tuned number.
+- The edge is small: about 1-2% a year at 3% risk with the safety stop (2001-2014: 1.3%, 2015-2026: 2.2%, worst drop 19%). Without a stop and at full size it made about 7% a year with a 26% drop. It is a low-correlation sleeve next to the crypto strategies, not a way to get rich.
+- Its first year on Hyperliquid (Oct 2025 to Nov 2026) lost 2.5%: 24 trades, half won, and four stops in March, June and October-November did the damage when both markets broke down. 24 trades is too few to tell luck from a broken edge.
+- Gold mean reversion is weaker than the Nasdaq's: the Raschke IBS and RSI(2) rules lost money on gold in both periods.
+`;
+
 const DIP_LESSONS = `---
 strategy: Dip buyer
 tags: [lessons]
@@ -357,6 +411,8 @@ export function initVault(root) {
     ['Lessons/Dip buyer.md', DIP_LESSONS],
     ['Strategies/Trend rider.md', TREND_STRATEGY],
     ['Lessons/Trend rider.md', TREND_LESSONS],
+    ['Strategies/Pullback.md', PULLBACK_STRATEGY],
+    ['Lessons/Pullback.md', PULLBACK_LESSONS],
   ];
   for (const [rel, content] of seed) {
     const f = path.join(root, rel);

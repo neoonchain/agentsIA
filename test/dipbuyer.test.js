@@ -92,13 +92,40 @@ test('an older example journal moves to the two tracks, keeping your own trades;
   const state = { examples: 'seeded', examplesVersion: 3, decisions: { 'Range breakout': [{ example: true }], Mine: [{ at: 'x' }] } };
   assert.equal(seedExamples(dir, state), true);
   const j = V.listJournal(dir);
-  assert.equal(j.length, 1 + 80 + 129); assert.ok(j.some(t => t.tags.includes('mine')));
-  assert.equal(state.examplesVersion, 4); assert.ok(state.track && state.trend);
+  assert.equal(j.length, 1 + 80 + 129 + 24); assert.ok(j.some(t => t.tags.includes('mine')));
+  assert.equal(state.examplesVersion, 5); assert.ok(state.track && state.trend && state.pullback);
   assert.equal(seedExamples(dir, state), false); // only once
-  for (const n of ['Dip buyer', 'Trend rider']) assert.ok(fs.existsSync(path.join(dir, 'Strategies', `${n}.md`)) && fs.existsSync(path.join(dir, 'Lessons', `${n}.md`)));
+  for (const n of ['Dip buyer', 'Trend rider', 'Pullback']) assert.ok(fs.existsSync(path.join(dir, 'Strategies', `${n}.md`)) && fs.existsSync(path.join(dir, 'Lessons', `${n}.md`)));
   removeExampleState(state);
-  assert.equal(state.track, undefined); assert.equal(state.trend, undefined);
+  assert.equal(state.track, undefined); assert.equal(state.trend, undefined); assert.equal(state.pullback, undefined);
   assert.deepEqual(Object.keys(state.decisions), ['Mine']); // example decisions go, yours stay
+});
+
+test('a v4 example journal gains the Pullback track (Nasdaq 100 and gold) without touching the others', async () => {
+  const { seedExamples, pullbackTrades } = await import('../src/lib/examples.js');
+  const dir = path.join(tmp, 'v4'); V.initVault(dir);
+  V.createJournalTrade(dir, { date: '2025-01-03T10:00', asset: 'ETH-USD', pnl: 12, tags: 'example, paper-track, dip-buyer', strategy: 'Dip buyer' });
+  const state = { examples: 'seeded', examplesVersion: 4, track: { lastT: 1 }, trend: { lastT: 1 }, decisions: {} };
+  assert.equal(seedExamples(dir, state), true);
+  const j = V.listJournal(dir), pb = j.filter(t => t.strategy === 'Pullback');
+  assert.equal(pb.length, pullbackTrades().length); assert.equal(j.length, 1 + pb.length);
+  assert.ok(pb.every(t => /^(XYZ100|GOLD)-XYZ$/.test(t.asset) && t.tags.includes('example')));
+  assert.equal(state.examplesVersion, 5); assert.ok(state.pullback.lastT > 0); assert.equal(state.decisions.Pullback.length, 30);
+  assert.equal(state.track.lastT, 1); // the other tracks keep going where they were
+});
+
+test('Pullback rules: buy a 7-day low close above the 200-day average, sell a 7-day high close, 3% risk to the stop', async () => {
+  const { stepPullback, newPullbackTrack } = await import('../src/lib/pullback.js');
+  const D = 86400000, t0 = Date.parse('2024-01-01'), c = [];
+  for (let k = 0; c.length < 260; k++) { const t = t0 + k * D, wd = new Date(t).getUTCDay(); if (!wd || wd === 6) continue; const close = 100 + c.length * 0.2; c.push({ t, open: close, high: close + 1, low: close - 1, close, wd }); } // weekdays, like the index
+  const n = c.length; // a 3-day dip, then a bounce to a new high
+  [-6, -7, -8].forEach((d, j) => { const x = c[n - 10 + j]; x.close = x.open = c[n - 11].close + d; x.high = x.close + 1; x.low = x.close - 1; });
+  const daily = { 'XYZ100-XYZ': c.map(({ wd, ...x }) => x) };
+  const st = newPullbackTrack(c[0].t, 10000), { trades } = stepPullback(st, daily, c.at(-1).t);
+  assert.ok(trades.length >= 1); const t = trades[0];
+  assert.equal(t.asset, 'XYZ100-XYZ'); assert.ok(t.pnl > 0, 'the bounce pays'); assert.match(t.why, /7-day high/);
+  assert.ok(Math.abs(t.qty * t.entry * 0.08 - 10000 * 0.03) < 1, 'sized so the 8% stop risks 3%');
+  assert.ok(t.fees > 0 && t.funding > 0, 'fees and funding are paid');
 });
 
 test('a trade logged without a PnL gets its real PnL and R written into the note', () => {

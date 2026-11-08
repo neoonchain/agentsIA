@@ -6,3 +6,6 @@ desktop/dist/
 
 proxy/data/
 site/
+scripts/research/pullback-daily.json
+scripts/research/ndx.json
+scripts/research/gc.json

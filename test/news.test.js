@@ -120,20 +120,20 @@ test('an empty vault gets the paper-test examples once; removing them is permane
   try {
     const app = new App();
     const j = V.listJournal(app.vault);
-    assert.equal(j.length, 209); assert.ok(j.every(t => t.tags.includes('example'))); // the two paper tracks: 80 Dip buyer + 129 Trend rider
+    assert.equal(j.length, 233); assert.ok(j.every(t => t.tags.includes('example'))); // the three paper tracks: 80 Dip buyer + 129 Trend rider + 24 Pullback
     assert.equal(j.filter(t => t.strategy === 'Dip buyer').length, 80); assert.equal(j.filter(t => t.strategy === 'Trend rider').length, 129);
     assert.ok(j.every(t => t.entry > 0 && t.exit > 0 && t.stop > 0), 'prices are numbers in the notes'); // BTC and ETH too
-    assert.equal(app.state.examplesVersion, 4); assert.ok(app.state.track.lastT > 0 && app.state.trend.lastT > 0);
+    assert.equal(app.state.examplesVersion, 5); assert.ok(app.state.track.lastT > 0 && app.state.trend.lastT > 0 && app.state.pullback.lastT > 0);
     assert.equal(app.state.decisions['Dip buyer'].length, 30); assert.equal(app.state.decisions['Trend rider'].length, 30);
     const ex = app.state.decisions['Range breakout'];
     assert.equal(ex.length, 10); assert.ok(ex.every(d => d.example)); assert.equal(ex.at(-1).outcome, 'opened'); // paper test 4, newest first
-    assert.equal(await app.chartsReady, 209); // every example gets its chart in Attachments/
+    assert.equal(await app.chartsReady, 233); // every example gets its chart in Attachments/
     const withCharts = V.listJournal(app.vault).filter(t => t.image);
-    assert.equal(withCharts.length, 209);
+    assert.equal(withCharts.length, 233);
     assert.ok(withCharts.every(t => /^Attachments\/.+\.webp$/.test(t.image)), JSON.stringify(withCharts.map(t => t.image)));
     assert.ok(V.readImage(app.vault, withCharts[0].image));
     const { removeExamples } = await import('../src/lib/examples.js');
-    assert.equal(removeExamples(app.vault), 209); app.state.examples = 'removed'; app.save();
+    assert.equal(removeExamples(app.vault), 233); app.state.examples = 'removed'; app.save();
     assert.equal(V.listJournal(new App().vault).length, 0); // reopening does not seed again
   } finally { process.env.KAIROS_EXAMPLES = '0'; }
 });
