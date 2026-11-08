@@ -85,6 +85,17 @@ npm test
 
 Every strategy page shows a chart (TradingView Lightweight Charts, Apache-2.0) of each market it trades, 1h or 1d, with the agent's entries and exits on it (green: the trade won, red: it lost), the entry, stop and target lines of open positions, and next to it the strategy's rules and every decision the agent took. Clicking a decision moves the chart to that day.
 
+## KAIROS holders
+
+When the KAIROS token is live, the app can require it. Guests can still look at everything (examples, charts, strategies, decisions, Argus). Using a feature (logging trades, asking the team, running strategies, alerts, real money) needs a wallet that is signed in and holds at least $1 of KAIROS.
+
+- **Signing in.** Connect a browser wallet (MetaMask, Rabby) and sign a message. It costs nothing, needs no gas and moves no funds. In the desktop app, sign in once from a browser at the same local address and the app remembers it.
+- **The holding.** Kairos reads the wallet's KAIROS balance on Elysium and checks it again every few minutes, so selling below $1 closes the features again.
+- **No dependencies.** Elysium's own node hashes the message and recovers the signer through the ecrecover precompile. The balance is a plain ERC-20 `balanceOf` call.
+- **Off by default.** The gate turns on when `gate.token` (the token address) and `gate.usdPerToken` are set in `~/.kairos/config.json`. `gate.minUsd` (default 1) and `gate.buyUrl` are optional.
+
+The app is open source and runs on your machine, so anyone can switch the gate off in their own copy. It is a door, not a lock. Where it really protects something is in services Kairos runs for you, such as the 24/7 cloud agent or AI credits.
+
 ## Real money (Kraken)
 
 1. In **Team settings → Kraken**, connect an API key with only *Query Funds*, *Query Open/Closed Orders & Trades*, *Create & Modify Orders* and *Cancel/Close Orders*. The app refuses any key that can withdraw.

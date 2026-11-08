@@ -20,6 +20,7 @@ const STATIC = {
   '/app.css': [path.join(here, 'public', 'app.css'), 'text/css'],
   '/lightweight-charts.js': [path.join(here, 'public', 'lightweight-charts.js'), 'text/javascript'],
   '/lib/markets.js': [path.join(here, 'lib', 'markets.js'), 'text/javascript'], // market names, shared with the app
+  '/lib/wallet.js': [path.join(here, 'lib', 'wallet.js'), 'text/javascript'], // the sign-in message, shared with the app
 };
 
 async function readBody(req) {

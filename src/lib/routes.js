@@ -39,6 +39,11 @@ export function createApi(app) {
     // candles for the strategy chart: tf 1h (last ~300 hours) or 1d (last ~300 days)
     ['GET', /^\/api\/candles$/, async q => { const asset = String(q.get('asset') || ''), tf = q.get('tf') === '1h' ? '1h' : '1d', limit = Math.min(Number(q.get('limit')) || 300, 300);
       if (!validAsset(asset)) throw err(400, 'Invalid asset'); return { asset, tf, candles: tf === '1h' ? await getCandles(asset, limit) : await getDailyCandles(asset, limit) }; }],
+    ['GET', /^\/api\/auth$/, async () => app.gateStatus()],
+    ['GET', /^\/api\/auth\/verify-refresh$/, async () => app.gateStatus({ refresh: true })],
+    ['POST', /^\/api\/auth\/nonce$/, async () => app.authNonce()],
+    ['POST', /^\/api\/auth\/verify$/, async (_, b) => app.authVerify(b)],
+    ['POST', /^\/api\/auth\/logout$/, async () => app.logout()],
     ['GET', /^\/api\/track$/, async () => app.state.examples !== 'seeded' ? [] : [['track', 'Dip buyer'], ['trend', 'Trend rider']].filter(([k]) => app.state[k]).map(([k, name]) => { const t = app.state[k], d = app.state.decisions?.[name]?.find(x => x.track); return { name, lastDay: new Date(t.lastT).toISOString().slice(0, 10), outcome: d?.outcome || null, why: d ? d.thesis.split('\n')[0] : '', holding: Object.keys(t.pos) }; })],
     ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; removeExampleState(app.state); app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
@@ -120,6 +125,8 @@ export function createApi(app) {
       for (const [m, re, fn] of routes) {
         const match = pathname.match(re);
         if (!match || m !== method) continue;
+        // guests can look at everything; changing anything needs a signed-in KAIROS holder (when the gate is on)
+        if (method !== 'GET' && !pathname.startsWith('/api/auth/')) await app.requireAccess();
         const params = match.map((x, i) => (i ? decodeURIComponent(x) : x));
         return { status: 200, body: await fn(searchParams, body || {}, params) };
       }

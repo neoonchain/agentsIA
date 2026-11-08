@@ -40,6 +40,9 @@ const DEFAULTS = {
   webSearch: false,
   news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '', relay: true, relayTopic: '', alerts: [], notify: { shocks: true, headlines: true, alerts: true } },
   xBearer: '',
+  // KAIROS holder gate: off until the token exists. With a token address and a price, using the app's features needs a
+  // signed-in wallet holding at least minUsd of KAIROS; guests can still look at everything.
+  gate: { token: '', rpc: 'https://testnet-rpc.elysium.kinetiq.xyz', chainId: 99801, symbol: 'KAIROS', minUsd: 1, usdPerToken: 0, buyUrl: '' },
   freeRemaining: null,     // last value reported by the free-trial proxy
   installId: '',
 };

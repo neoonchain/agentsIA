@@ -13,6 +13,7 @@ import { dailyReadings, readingsText, stepTrack, trackJournalEntry, trackDecisio
 import { stepTrend, trendDecision, trendJournalEntry, trendReadings } from './trendrider.js';
 import { isPerp } from './hyperliquid.js';
 import { marketName } from './markets.js';
+import * as W from './wallet.js';
 import { RUN4_DECISIONS } from './examples-decisions.js';
 import { NewsHub, SOURCES as NEWS, DEFAULT_RSS, detectShock, baseOf, relayPoll } from './news.js';
 import { getCandles1m } from './market.js';
@@ -678,6 +679,44 @@ For "hold" only "action" and "thesis" are needed. For "close" give the asset.`, 
     this.save();
     this.note(`[[${name}]] promotion ${action}${action === 'approve' ? ` · $${cur.tierUsd} tier approved; go live from the strategy page` : ''}`);
     return this.state.promotions[name];
+  }
+
+  /* ---------- KAIROS holder gate ---------- */
+  gateOn() { const g = this.config.gate || {}; return !!(W.isAddress(g.token) && Number(g.usdPerToken) > 0); }
+  /** What the app shows: guest or signed in, the holding in tokens and dollars, and whether features are open. */
+  async gateStatus({ refresh = false } = {}) {
+    const g = this.config.gate || {}, s = this.state.session || null;
+    if (!this.gateOn()) return { on: false, access: true, address: s?.address || null };
+    if (s && (refresh || !s.checkedAt || Date.now() - s.checkedAt > 5 * 60000)) {
+      try { s.balance = await (this.readBalance || W.tokenBalance)(g.rpc, g.token, s.address); s.checkedAt = Date.now(); this.save(); } catch { /* keep the last reading */ }
+    }
+    const usd = s ? +(s.balance * g.usdPerToken).toFixed(2) : 0;
+    return { on: true, address: s?.address || null, balance: s?.balance ?? 0, usd, minUsd: g.minUsd, symbol: g.symbol, buyUrl: g.buyUrl, access: !!s && usd >= g.minUsd };
+  }
+  authNonce() {
+    const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    this.authNonces = (this.authNonces || []).filter(n => Date.now() - n.at < 10 * 60000).concat({ nonce, at: Date.now() });
+    return { nonce, issuedAt: new Date().toISOString() };
+  }
+  /** Check the signature of the login message, remember the wallet, read its KAIROS. */
+  async authVerify({ address, nonce, issuedAt, signature }) {
+    if (!W.isAddress(address)) throw Object.assign(new Error('Invalid wallet address'), { status: 400 });
+    const n = (this.authNonces || []).find(x => x.nonce === nonce);
+    if (!n || Date.now() - n.at > 10 * 60000) throw Object.assign(new Error('The sign-in request expired. Try again.'), { status: 400 });
+    this.authNonces = this.authNonces.filter(x => x !== n); // one use
+    const signer = await (this.recoverSigner || W.recoverSigner)(this.config.gate.rpc, W.loginMessage(address, nonce, issuedAt), signature);
+    if (!signer || signer !== address.toLowerCase()) throw Object.assign(new Error('The signature does not match this wallet'), { status: 401 });
+    this.state.session = { address: signer, verifiedAt: new Date().toISOString(), balance: 0, checkedAt: 0 };
+    this.save();
+    return this.gateStatus({ refresh: true });
+  }
+  logout() { delete this.state.session; this.save(); return { ok: true }; }
+  /** Throws for guests and for wallets under the minimum, when the gate is on. */
+  async requireAccess() {
+    if (!this.gateOn()) return;
+    const st = await this.gateStatus();
+    if (!st.address) throw Object.assign(new Error(`Guest mode: connect a wallet holding at least $${st.minUsd} of ${st.symbol} to use Kairos.`), { status: 401, code: 'NEED_WALLET' });
+    if (!st.access) throw Object.assign(new Error(`This wallet holds $${st.usd} of ${st.symbol}; Kairos needs at least $${st.minUsd}.`), { status: 403, code: 'NEED_TOKENS' });
   }
 
   async strategyView(name) {

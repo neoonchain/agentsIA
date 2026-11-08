@@ -1,5 +1,6 @@
 // Kairos workspace UI. Everything model- or vault-generated is escaped before rendering.
 import { marketName, marketVenue } from './lib/markets.js';
+import { loginMessage } from './lib/wallet.js';
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -61,7 +62,45 @@ function toast(msg, err = false) {
 function fail(e) {
   toast(e.message, true);
   if (e.code === 'NEED_KEY') setTimeout(() => go('team'), 600);
+  if (e.code === 'NEED_WALLET' || e.code === 'NEED_TOKENS') setTimeout(openWallet, 400);
 }
+
+/* ---------- KAIROS holder gate: guests look, holders use ---------- */
+let gate = { on: false, access: true };
+const short = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
+async function refreshGate() {
+  try { gate = await api('/auth'); } catch { gate = { on: false, access: true }; }
+  const btn = $('#walletBtn'), bar = $('#gateBar');
+  btn.hidden = !gate.on; bar.hidden = !gate.on || gate.access;
+  if (!gate.on) return;
+  btn.innerHTML = gate.address ? `<span class="dot ${gate.access ? 'ok' : ''}"></span>${esc(short(gate.address))}<small>$${esc(gate.usd)} ${esc(gate.symbol)}</small>` : 'Connect wallet';
+  bar.innerHTML = gate.address
+    ? `<div class="banner gate"><span><b>Your wallet holds $${esc(gate.usd)} of ${esc(gate.symbol)}.</b> Kairos needs at least $${esc(gate.minUsd)} to use its features; you can keep browsing as a guest.</span>${gate.buyUrl ? `<a class="btn sm dark" href="${esc(gate.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy ${esc(gate.symbol)}</a>` : ''}</div>`
+    : `<div class="banner gate"><span><b>Guest mode.</b> Look around freely. To log trades, ask the team, run strategies or set alerts, connect a wallet holding at least $${esc(gate.minUsd)} of ${esc(gate.symbol)}.</span><button class="btn sm dark" id="gateConnect">Connect wallet</button></div>`;
+  const c = $('#gateConnect'); if (c) c.onclick = openWallet;
+}
+function openWallet() {
+  $('#dlgTitle').textContent = gate.address ? 'Your wallet' : 'Connect your wallet';
+  const eth = window.ethereum;
+  $('#dlgBody').innerHTML = gate.address
+    ? `<p>Signed in as <b class="mono">${esc(gate.address)}</b>.</p><p>It holds <b>${esc(gate.balance)} ${esc(gate.symbol)}</b>, about <b>$${esc(gate.usd)}</b>. Kairos needs at least $${esc(gate.minUsd)}.</p><div class="row" style="margin-top:14px"><button class="btn" id="wRefresh">Check again</button>${gate.buyUrl ? `<a class="btn dark" href="${esc(gate.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy ${esc(gate.symbol)}</a>` : ''}<button class="btn" id="wOut">Sign out</button></div>`
+    : eth
+      ? `<p>Kairos checks that your wallet holds at least <b>$${esc(gate.minUsd)} of ${esc(gate.symbol)}</b> on Elysium.</p><p>You'll sign a message to prove the wallet is yours. <b>It costs nothing, needs no gas and moves no funds.</b></p><div class="row" style="margin-top:14px"><button class="btn dark" id="wGo">Connect and sign</button></div>`
+      : `<p>No wallet found in this window.</p><p>Install a browser wallet such as MetaMask or Rabby. In the desktop app, open <b class="mono">${esc(location.origin)}/app</b> in a browser that has your wallet and sign in there: Kairos remembers it here too.</p>`;
+  $('#dlg').showModal();
+  const go = $('#wGo'); if (go) go.onclick = () => busy(go, async () => {
+    const [address] = await eth.request({ method: 'eth_requestAccounts' });
+    const { nonce, issuedAt } = await api('/auth/nonce', { method: 'POST' });
+    const msg = loginMessage(address, nonce, issuedAt);
+    const hex = '0x' + [...new TextEncoder().encode(msg)].map(b => b.toString(16).padStart(2, '0')).join('');
+    const signature = await eth.request({ method: 'personal_sign', params: [hex, address] });
+    const st = await api('/auth/verify', { method: 'POST', body: { address, nonce, issuedAt, signature } });
+    $('#dlg').close(); await refreshGate(); toast(st.access ? 'Wallet connected' : `Connected, but it holds $${st.usd} of ${st.symbol}`, !st.access); render();
+  });
+  const rf = $('#wRefresh'); if (rf) rf.onclick = () => busy(rf, async () => { await api('/auth/verify-refresh').catch(() => null); await refreshGate(); openWallet(); });
+  const out = $('#wOut'); if (out) out.onclick = () => busy(out, async () => { await api('/auth/logout', { method: 'POST' }); $('#dlg').close(); await refreshGate(); render(); });
+}
+$('#walletBtn').onclick = openWallet;
 async function busy(btn, fn) {
   const label = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + esc(btn.dataset.busy || 'Working');
   try { return await fn(); } catch (e) { fail(e); } finally { btn.disabled = false; btn.innerHTML = label; }
@@ -832,6 +871,7 @@ async function render(enter = false) {
 
 (async () => {
   try { await refreshSettings(); } catch (e) { view.innerHTML = `<div class="banner">Cannot reach the local server: ${esc(e.message)}</div>`; return; }
+  await refreshGate();
   const h = location.hash.slice(1); if (views[h]) current = h;
   render();
   setInterval(() => { if (current === 'overview' && !document.hidden) render(); }, 30000);
