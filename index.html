@@ -505,6 +505,13 @@ if (!reduce && matchMedia('(pointer:fine)').matches) document.querySelectorAll('
 
 
 
+/* Dock icons: drawn by default. Put your own PNGs in assets/dock/ (finder.png, launchpad.png, safari.png, mail.png,
+   photos.png, facetime.png) and set data-icons="assets/dock/" on .dock to show them instead. */
+document.querySelectorAll('.dock[data-icons] .app-i[title]:not(.kai)').forEach(el => {
+  const img = new Image(); img.alt = ''; img.onload = () => el.replaceChildren(img);
+  img.src = el.closest('.dock').dataset.icons + el.title.toLowerCase() + '.png';
+});
+
 /* keep Kairos in your Dock: install the web app (PWA), or explain how on browsers without a prompt */
 let deferred = null;
 const dockBtn = document.getElementById('dockBtn'), how = document.getElementById('how'), kai = document.getElementById('kaiIcon');

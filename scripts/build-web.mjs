@@ -15,7 +15,7 @@ copy('index.html', 'index.html');
 copy('tour.html', 'tour.html');
 copy('manifest.webmanifest', 'manifest.webmanifest');
 copy('sw.js', 'sw.js');
-for (const f of fs.existsSync(path.join(root, 'assets')) ? fs.readdirSync(path.join(root, 'assets')) : []) copy(`assets/${f}`, `assets/${f}`);
+for (const f of fs.existsSync(path.join(root, 'assets')) ? fs.readdirSync(path.join(root, 'assets'), { recursive: true }) : []) if (fs.statSync(path.join(root, 'assets', f)).isFile()) copy(`assets/${f}`, `assets/${f}`); // folders too (assets/dock/)
 for (const f of fs.readdirSync(path.join(root, 'src/lib'))) if (f.endsWith('.js')) copy(`src/lib/${f}`, `app/lib/${f}`);
 for (const f of fs.readdirSync(path.join(root, 'src/web/shims'))) copy(`src/web/shims/${f}`, `app/shims/${f}`);
 copy('src/web/boot.js', 'app/boot.js');
