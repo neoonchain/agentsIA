@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // coin logos (assets/coin-*.webp); unknown tickers just show text
-const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT']);
+const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT', 'XRP', 'LTC', 'ADA', 'LINK']);
 const coinBase = a => { const b = String(a || '').split('-')[0].toUpperCase(); return /^K[A-Z]{3,}$/.test(b) && COINS.has(b.slice(1)) ? b.slice(1) : b; };
 const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="../assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
 // the market's real name, with its id small next to it ("Nasdaq 100  XYZ100-XYZ")
@@ -236,7 +236,7 @@ const views = {
           <div class="card stat"><span class="eyebrow">Avg R</span><div class="n ${cls(rs.length ? sum(rs, r => r) : 0)}">${rs.length ? (sum(rs, r => r) / rs.length).toFixed(2) : '–'}</div></div>
         </div>
       </div>
-      ${trades.length ? pnlCalendar(trades, views.journal.month) : ''}
+      ${trades.length ? pnlCalendar(trades, views.journal.month, (track || []).map(tr => `${tr.name}: ${tr.why}`)) : ''}
       <form class="card soft jform" id="tradeForm" ${trades.length ? 'hidden' : ''}>
         <label class="drop" id="drop" tabindex="0"><input type="file" accept="image/*" id="shot" hidden>
           <div class="drop-empty"><b>Chart screenshot</b><span>Paste (Ctrl/⌘ V), drop an image here, or click to choose</span></div>
@@ -261,17 +261,18 @@ const views = {
         </div>
       </form>
       ${trades.length ? `<div class="row jfilter" id="jfilter">${[['all', 'All'], ['wins', `Wins · ${listed.filter(t => t.pnl > 0).length}`], ['losses', `Losses · ${listed.filter(t => t.pnl < 0).length}`], ['shots', 'With screenshot']].map(([k, l]) => `<button class="chipbtn ${filt === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>` : ''}
-      <div class="jgrid">${shown.map(t => `
+      <div class="jgrid ${views.journal.more ? 'open' : ''}">${shown.slice(0, views.journal.more ? shown.length : 12).map(t => `
         <article class="jcard ${t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : ''}" data-note="${esc(t.path)}">
           <div class="jthumb" ${t.image ? `data-img="${esc(t.image)}"` : ''}>${t.image ? '' : `<span class="jph">${coin(t.asset, 56) || esc(t.asset.split('-')[0] || '—')}</span>`}
             <span class="jside ${t.side}">${esc(t.side)}</span></div>
           <div class="jbody">
             <div class="row" style="justify-content:space-between"><b>${withCoin(t.asset)}</b><span class="num ${cls(t.pnl)}">${money(t.pnl)}${t.r != null ? ` · ${t.r > 0 ? '+' : ''}${t.r}R` : ''}</span></div>
             <p class="sub">${esc(t.date)}${t.strategy ? ` · ${esc(t.strategy)}` : ''}</p>
-            ${t.thesis ? `<p class="jthesis">${esc(t.thesis.slice(0, 120))}${t.thesis.length > 120 ? '…' : ''}</p>` : ''}
+            ${t.thesis ? (views.journal.more ? `<div class="jthesis full">${md(t.thesis)}</div>` : `<p class="jthesis">${esc(t.thesis.slice(0, 120))}${t.thesis.length > 120 ? '…' : ''}</p>`) : ''}
             <div class="row" style="gap:6px">${t.emotion ? `<span class="chip">${esc(t.emotion.slice(0, 28))}</span>` : ''}${t.tags.slice(0, 3).map(x => `<span class="chip">#${esc(x)}</span>`).join('')}</div>
           </div>
-        </article>`).join('') || (trades.length ? '<p class="empty">No trades match this filter.</p>' : '')}</div>`;
+        </article>`).join('') || (trades.length ? '<p class="empty">No trades match this filter.</p>' : '')}</div>
+      ${shown.length > 12 ? `<div class="jmore"><button class="btn" id="jMore">${views.journal.more ? 'Show less' : `See all ${shown.length} trades with their full thesis`}</button></div>` : ''}`;
 
     // thumbnails load after the grid is on screen
     view.querySelectorAll('.jthumb[data-img]').forEach(async el => { try { el.style.backgroundImage = `url("${await imageUrl(el.dataset.img)}")`; el.classList.add('has'); } catch { /* moved or deleted */ } });
@@ -281,6 +282,7 @@ const views = {
     $('#cancelTrade').onclick = () => { f.hidden = true; };
     view.querySelectorAll('[data-month]').forEach(b => (b.onclick = () => { views.journal.month = b.dataset.month; render(); }));
     if ($('#sharePnl')) $('#sharePnl').onclick = () => openShare(trades, views.journal.month);
+    if ($('#jMore')) $('#jMore').onclick = () => { const was = views.journal.more; views.journal.more = !was; render(); if (was) $('#jfilter')?.scrollIntoView({ block: 'start' }); };
     if ($('#jfilter')) $('#jfilter').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { views.journal.filter = b.dataset.f; render(); } };
     // screenshot: click, drop or paste; compressed in the browser before upload
     let shot = null;
@@ -739,8 +741,10 @@ document.addEventListener('click', e => {
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (views[v] && v !== current) { current = v; render(); } });
 
 /* ---------- PnL calendar ---------- */
-function pnlCalendar(trades, month){
-  const months = [...new Set(trades.map(t => String(t.date).slice(0, 7)))].sort();
+function pnlCalendar(trades, month, why = []){
+  const now = new Date().toISOString().slice(0, 7), months = [];
+  const first0 = [...trades.map(t => String(t.date).slice(0, 7))].sort()[0] || now;
+  for (let [y, mo] = first0.split('-').map(Number); `${y}-${String(mo).padStart(2, '0')}` <= (now > first0 ? now : first0); mo === 12 ? (y++, mo = 1) : mo++) months.push(`${y}-${String(mo).padStart(2, '0')}`);
   const m = months.includes(month) ? month : months.at(-1), i = months.indexOf(m);
   const [y, mo] = m.split('-').map(Number), first = new Date(Date.UTC(y, mo - 1, 1)), days = new Date(Date.UTC(y, mo, 0)).getUTCDate();
   const byDay = {}; for (const t of trades) { const d = String(t.date).slice(0, 10); if (d.startsWith(m)) { const x = byDay[d] ||= { pnl: 0, n: 0 }; x.pnl += t.pnl; x.n++; } }
@@ -755,6 +759,7 @@ function pnlCalendar(trades, month){
   return `<section class="card pcal"><div class="pcal-h"><div><span class="eyebrow">PnL calendar</span><h2>${label}</h2></div>
     <div class="pcal-sum"><span class="num ${cls(tot)}">${money(tot)}</span><span class="sub">${n} trade${n === 1 ? "" : "s"} · ${vals.length} trading day${vals.length === 1 ? "" : "s"}</span></div>
     <div class="row"><button class="btn sm" ${i > 0 ? `data-month="${months[i - 1]}"` : 'disabled'} aria-label="Previous month">←</button><button class="btn sm" ${i < months.length - 1 ? `data-month="${months[i + 1]}"` : 'disabled'} aria-label="Next month">→</button></div></div>
+    ${n ? '' : `<p class="pcal-note">No trades closed this month: the rules stayed in cash.${why.length ? ' ' + why.map(esc).join(' ') : ''}</p>`}
     <div class="pcal-g">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="cw">${d}</div>`).join('')}${cells.join('')}</div></section>`;
 }
 

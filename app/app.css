@@ -409,3 +409,8 @@ label.ri input{width:auto}
 .walletbtn .dot{width:8px;height:8px;border-radius:50%;background:#f0a03c}.walletbtn .dot.ok{background:#22c58b}
 #gateBar{margin-top:14px}#gateBar .banner.gate{display:flex;gap:14px;align-items:center;justify-content:space-between;border-color:var(--line);background:var(--card);margin-bottom:0}
 @media (max-width:720px){.walletbtn small{display:none}#gateBar .banner.gate{flex-direction:column;align-items:flex-start}}
+
+/* journal: 12 cards, then all with full theses */
+.jmore{display:flex;justify-content:center;margin-top:18px}
+.jthesis.full{font-size:13.5px;line-height:1.55;color:var(--ink-2)}.jthesis.full p{margin:0 0 6px}.jthesis.full ul{margin:0 0 6px;padding-left:18px}
+.pcal-note{margin:0 0 12px;font-size:13.5px;color:var(--mute-2)}
