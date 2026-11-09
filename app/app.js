@@ -5,11 +5,11 @@ const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // coin logos (assets/coin-*.webp); unknown tickers just show text
-const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT', 'XRP', 'LTC', 'ADA', 'LINK']);
+const COINS = new Set(['BTC', 'ETH', 'SOL', 'DOGE', 'SHIB', 'PEPE', 'BONK', 'WIF', 'FLOKI', 'TRUMP', 'PENGU', 'POPCAT', 'XRP', 'LTC', 'ADA', 'LINK', 'XYZ100', 'SP500', 'GOLD', 'SILVER', 'CL']);
 const coinBase = a => { const b = String(a || '').split('-')[0].toUpperCase(); return /^K[A-Z]{3,}$/.test(b) && COINS.has(b.slice(1)) ? b.slice(1) : b; };
 const coin = (a, size = 18) => COINS.has(coinBase(a)) ? `<img class="coin" src="../assets/coin-${coinBase(a).toLowerCase()}.webp" alt="" width="${size}" height="${size}" loading="lazy">` : '';
 // the market's real name, with its id small next to it ("Nasdaq 100  XYZ100-XYZ")
-const withCoin = a => { const n = marketName(a); return `<span class="wc" title="${esc(a)} · ${esc(marketVenue(a))}">${coin(a)}${esc(n)}${n.toUpperCase() !== String(a).toUpperCase() ? `<small class="wc-id">${esc(a)}</small>` : ''}</span>`; };
+const withCoin = a => { const n = marketName(a), q = String(a).toUpperCase().split('-')[1], tag = q === 'XYZ' ? 'Trade.xyz' : q === 'PERP' ? 'perp' : a; return `<span class="wc" title="${esc(a)} · ${esc(marketVenue(a))}">${coin(a)}${esc(n)}${n.toUpperCase() !== String(a).toUpperCase() ? `<small class="wc-id">${esc(tag)}</small>` : ''}</span>`; };
 const money = n => (n >= 0 ? '+' : '−') + '$' + Math.abs(Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const fp = x => (typeof x === 'number' && Number.isFinite(x) ? (Math.abs(x) >= 1 ? x.toLocaleString('en-US', { maximumFractionDigits: 2 }) : Number(x.toPrecision(4)).toString()) : (x ?? '–'));
 /** Small samples show counts, not a misleading percentage. */
@@ -385,7 +385,7 @@ const views = {
     const web = settings.web;
     view.innerHTML = `
       <div class="head"><div><h1>Argus</h1><p>The watcher with a hundred eyes: news and price shocks, checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
-        <button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Notifications on' : 'Turn on notifications'}</button></div>
+        <div class="row">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? '<span class="sub">Notifications on</span><button class="btn" id="notifyTest">Send a test</button>' : `<button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'denied' ? 'Notifications blocked' : 'Turn on notifications'}</button>`}</div></div>
       <div class="grid g2">
         <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${withCoin(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
           ${Object.keys(d.guards).length ? `<p class="sub" style="margin-top:10px">Guard active: ${Object.entries(d.guards).map(([a, g]) => `${esc(a)} until ${new Date(g.until).toLocaleTimeString()}`).join(' · ')}</p>` : ''}
@@ -406,7 +406,7 @@ const views = {
             <label class="tg"><input type="checkbox" data-n="headlines" ${ns.notify?.headlines !== false ? 'checked' : ''}><span></span><b>Headlines</b><em>News about the coins you watch</em></label>
             <label class="tg"><input type="checkbox" data-n="alerts" ${ns.notify?.alerts !== false ? 'checked' : ''}><span></span><b>Price alerts</b><em>When one of your levels is hit</em></label>
           </div>
-          <p class="sub" style="margin-top:10px">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Browser notifications are on.' : 'Turn on browser notifications at the top of this page to get them outside the tab.'}</p>
+          <p class="sub" style="margin-top:10px">${lastNotified ? `Last notification ${agoText(new Date(lastNotified.at).toISOString())}: ${esc(lastNotified.msg.slice(0, 80))}. ` : 'Nothing to notify since this window opened: notifications come for shocks, headlines that name a coin you watch, and price alerts, while Kairos is open. '}${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Browser notifications are on.' : 'Turn on browser notifications at the top of this page to get them outside the tab.'}</p>
         </div>
         <div class="card"><h3>Forward alerts from anywhere</h3>
           <p class="sub" style="margin:6px 0 14px">j7tracker through a Telegram or Discord bot, TradingView, n8n, Zapier or a script: anything that can send a web request can feed the agents. Kairos reads your private address every 30 seconds, ${web ? 'right here in the browser.' : 'with no tunnel needed.'}</p>
@@ -443,7 +443,11 @@ const views = {
         </div>
       </div>`;
     $('#nfilter').onclick = e => { const b = e.target.closest('[data-o]'); if (b) { views.news.only = b.dataset.o === '1'; render(); } };
-    $('#notify').onclick = async () => { if (typeof Notification === 'undefined') return toast('This browser has no notifications', true); toast((await Notification.requestPermission()) === 'granted' ? 'Notifications on' : 'Notifications blocked', false); render(); };
+    if ($('#notify')) $('#notify').onclick = async () => {
+      if (typeof Notification === 'undefined') return toast('This browser has no notifications', true);
+      if (Notification.permission === 'denied') return toast('Notifications are blocked for this site: allow them in the browser\'s site settings (the icon left of the address bar), then reload.', true);
+      const ok = (await Notification.requestPermission()) === 'granted'; toast(ok ? 'Notifications on' : 'Notifications blocked', !ok); if (ok) notifyUser('Notifications are on. Argus will tell you about shocks, headlines on your coins and price alerts.'); render(); };
+    if ($('#notifyTest')) $('#notifyTest').onclick = async () => toast(await notifyUser('Test notification from Argus. If you see this, alerts will reach you.') ? 'Test sent. Nothing showed up? Allow notifications for your browser (or Kairos) in your computer\'s notification settings, and turn off Do Not Disturb or Focus.' : 'Could not send it: notifications are not allowed here', false);
     const put = async (body, msg) => { await api('/news/settings', { method: 'PUT', body }); if (msg) toast(msg); render(); };
     $('#nSave').onclick = () => busy($('#nSave'), async () => {
       const body = { tree: $('#nTree').checked, rss: $('#nRss').checked, x: $('#nX').checked, watch: $('#nWatch').value.split(',') };
@@ -851,7 +855,12 @@ function openShare(trades, month){
   $('#dlg').addEventListener('close', () => cancelAnimationFrame(raf), { once: true });
 }
 
-let newsSeen = null;
+let newsSeen = null, lastNotified = null;
+async function notifyUser(body) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
+  try { const reg = await navigator.serviceWorker?.getRegistration?.(); if (reg?.showNotification) { await reg.showNotification('Argus · Kairos', { body, icon: '../assets/icon-192.png', tag: 'argus-' + Date.now() }); return true; } } catch { /* fall back */ }
+  try { new Notification('Argus · Kairos', { body, icon: '../assets/icon-192.png' }); return true; } catch { return false; }
+}
 async function watchNews() {
   try {
     const d = await api('/news'), watch = new Set(d.watch.map(a => a.split('-')[0]));
@@ -864,8 +873,7 @@ async function watchNews() {
       ...(nf.headlines !== false ? d.items.filter(i => (i.seenAt || 0) > newsSeen && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => i.title.slice(0, 120)) : [])];
     newsSeen = Math.max(newsSeen, latest);
     for (const msg of fresh) {
-      toast(msg);
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('Argus · Kairos', { body: msg });
+      toast(msg); notifyUser(msg); lastNotified = { at: Date.now(), msg };
     }
     if (fresh.length && current === 'news') render();
   } catch { /* server restarting */ }

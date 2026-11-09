@@ -24,5 +24,6 @@ async function boot() {
 }
 
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+if (process.platform === 'win32') app.setAppUserModelId('io.kairos.desktop'); // Windows shows notifications only for apps with an id
 app.whenReady().then(boot).catch(e => { dialog.showErrorBox('Kairos could not start', String((e && e.stack) || e)); app.quit(); });
 app.on('window-all-closed', () => { if (server) server.close(); app.quit(); });
