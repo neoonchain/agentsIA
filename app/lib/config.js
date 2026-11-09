@@ -52,7 +52,7 @@ const DEFAULTS = {
   webSearch: false,
   news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '', relay: true, relayTopic: '', alerts: [], notify: { shocks: true, headlines: true, alerts: true },
     // X accounts you follow in Argus (from Tree of Alpha or your X key): every post notifies you with its own sound
-    accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a })), accountsVersion: 2, sounds: { alerts: 'alarm', shocks: 'alert', headlines: 'pop' } },
+    accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a })), accountsVersion: 3, sounds: { alerts: 'alarm', shocks: 'alert', headlines: 'pop' } },
   xBearer: '',
   // KAIROS holder gate: off until the token exists. With a token address and a price, using the app's features needs a
   // signed-in wallet holding at least minUsd of KAIROS; guests can still look at everything.
@@ -88,6 +88,10 @@ export function loadConfig() {
     const have = new Set(kept.map(a => a.handle.toLowerCase()));
     c.news.accounts = [...kept, ...DEFAULT_ACCOUNTS.filter(a => !have.has(a.handle.toLowerCase())).map(a => ({ ...a }))];
     c.news.accountsVersion = 2;
+  }
+  if (saved.news && (saved.news.accountsVersion || 0) < 3) { // v3: tier10k and Watcher.Guru out (never in the free feed)
+    c.news.accounts = (c.news.accounts || []).filter(a => !['tier10k', 'watcherguru'].includes(a.handle.toLowerCase()));
+    c.news.accountsVersion = 3;
   }
   if (!c.installId) { c.installId = crypto.randomUUID(); try { saveConfig(c); } catch { /* read-only home: id stays per session */ } }
   return c;
