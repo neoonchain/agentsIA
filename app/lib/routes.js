@@ -48,7 +48,7 @@ export function createApi(app) {
     ['POST', /^\/api\/examples\/remove$/, async () => { const removed = removeExamples(app.vault); app.state.examples = 'removed'; removeExampleState(app.state); app.save(); return { removed }; }],
     ['GET', /^\/api\/note$/, async q => { const n = V.readNote(app.vault, q.get('path')); return { path: n.path, data: n.data, body: n.body }; }],
     ['GET', /^\/api\/news$/, async () => ({ items: app.news.items.slice(0, 120), shocks: app.news.shocks.slice(0, 30), status: app.news.status, watch: app.watchedAssets(),
-      guards: Object.fromEntries(Object.entries(app.shockUntil).filter(([, g]) => g.until > Date.now())), alerts: app.firedAlerts || [], notify: app.config.news.notify })],
+      guards: Object.fromEntries(Object.entries(app.shockUntil).filter(([, g]) => g.until > Date.now())), alerts: app.firedAlerts || [], notify: app.config.news.notify, accounts: app.config.news.accounts || [], sounds: app.config.news.sounds || {} })],
     ['GET', /^\/api\/news\/settings$/, async () => ({ ...app.config.news, hasXBearer: !!app.config.xBearer })],
     ['PUT', /^\/api\/news\/settings$/, async (_, b) => {
       const n = { ...app.config.news };
@@ -59,6 +59,10 @@ export function createApi(app) {
       if (b.rotateRelay) n.relayTopic = 'kairos-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24);
       if (typeof b.relay === 'boolean') n.relay = b.relay;
       if (b.notify && typeof b.notify === 'object') n.notify = { shocks: !!b.notify.shocks, headlines: !!b.notify.headlines, alerts: !!b.notify.alerts };
+      const SOUNDS = ['chime', 'ping', 'pop', 'alert', 'alarm', 'coin', 'none'], snd = v => SOUNDS.includes(v) ? v : 'chime';
+      if (Array.isArray(b.accounts)) n.accounts = b.accounts.map(a => ({ handle: String(a.handle || '').replace(/^@/, '').trim(), sound: snd(a.sound) }))
+        .filter((a, i, all) => /^[A-Za-z0-9_]{1,15}$/.test(a.handle) && all.findIndex(x => x.handle.toLowerCase() === a.handle.toLowerCase()) === i).slice(0, 30);
+      if (b.sounds && typeof b.sounds === 'object') n.sounds = Object.fromEntries(['alerts', 'shocks', 'headlines'].map(k => [k, snd(b.sounds[k] ?? n.sounds?.[k])]));
       if (b.addAlert) {
         const a = b.addAlert, asset = String(a.asset || '').trim().toUpperCase(), price = Number(a.price);
         if (!/^[A-Z0-9]{2,10}-[A-Z]{3,4}$/.test(asset) || !(price > 0) || !['above', 'below'].includes(a.op)) throw err(400, 'An alert needs a coin like BTC-USD, above or below, and a price');

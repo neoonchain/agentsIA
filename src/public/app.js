@@ -385,7 +385,7 @@ const views = {
     const web = settings.web;
     view.innerHTML = `
       <div class="head"><div><h1>Argus</h1><p>The watcher with a hundred eyes: news and price shocks, checked every 30 seconds. A shock (a fast move on heavy volume) makes running strategies decide right away, and Brake blocks new entries on that coin for ${esc(d.guardMin || 15)} minutes so the agents don't chase it.</p></div>
-        <div class="row">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? '<span class="sub">Notifications on</span><button class="btn" id="notifyTest">Send a test</button>' : `<button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'denied' ? 'Notifications blocked' : 'Turn on notifications'}</button>`}</div></div>
+        <div class="row">${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? '<span class="sub">Notifications on</span>' : `<button class="btn" id="notify">${typeof Notification !== 'undefined' && Notification.permission === 'denied' ? 'Notifications blocked' : 'Turn on notifications'}</button>`}<button class="btn" id="notifyTest">Send a test</button></div></div>
       <div class="grid g2">
         <div class="card"><h3>Shocks</h3>${d.shocks.length ? `<div class="shocks">${d.shocks.slice(0, 8).map(s => `<div class="shock ${s.dir}"><b class="mono">${withCoin(s.asset)}</b><span class="num ${s.movePct > 0 ? 'pos' : 'neg'}">${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min</span><span class="sub">volume ${s.volX}× · ${agoS(s.t)} ago</span></div>`).join('')}</div>` : '<p class="empty">No shocks yet. The watched coins are calm.</p>'}
           ${Object.keys(d.guards).length ? `<p class="sub" style="margin-top:10px">Guard active: ${Object.entries(d.guards).map(([a, g]) => `${esc(a)} until ${new Date(g.until).toLocaleTimeString()}`).join(' · ')}</p>` : ''}
@@ -400,13 +400,20 @@ const views = {
             <select name="op"><option value="above">goes above</option><option value="below">goes below</option></select><input name="price" type="number" step="any" min="0" placeholder="Price" required><button class="btn dark">Add</button>
             <input name="note" placeholder="Note (optional), e.g. breakout of the weekly range" class="al-note"></form>
           <div class="al-list">${(ns.alerts || []).length ? ns.alerts.slice().reverse().map(a => `<div class="al ${a.firedAt ? 'fired' : ''}"><span>${withCoin(a.asset)}</span><span class="mono">${a.op === 'above' ? '≥' : '≤'} ${esc(a.price)}</span><span class="sub">${a.firedAt ? `fired ${agoText(a.firedAt)} at ${esc(a.firedPrice)}` : 'armed'}${a.note ? ' · ' + esc(a.note) : ''}</span><span class="al-b">${a.firedAt ? `<button class="btn sm" data-rearm="${esc(a.id)}">Re-arm</button>` : ''}<button class="x" data-rm="${esc(a.id)}" aria-label="Remove alert">×</button></span></div>`).join('') : '<p class="empty">No alerts yet. Add one above: a level you care about, and Argus watches it for you.</p>'}</div>
+          <h3 style="margin-top:22px">Accounts you track</h3>
+          <p class="sub" style="margin:6px 0 12px">Every post from these X accounts pops up top right with its own sound, whatever coin it is about. From Tree of Alpha${web ? '' : ' and your X key'}.</p>
+          <form class="acc-form" id="accForm"><input name="handle" list="accSeen" placeholder="@WatcherGuru" class="mono" required autocomplete="off"><datalist id="accSeen">${[...new Set(d.items.map(i => i.account).filter(Boolean))].slice(0, 40).map(h => `<option value="@${esc(h)}">`).join('')}</datalist>
+            <select name="sound">${Object.entries(SOUNDS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select><button class="btn dark">Track</button></form>
+          <div class="acc-list">${(ns.accounts || []).length ? ns.accounts.map((a, k) => { const av = d.items.find(i => i.account?.toLowerCase() === a.handle.toLowerCase() && i.avatar)?.avatar;
+            return `<div class="acc">${av ? `<img src="${esc(av)}" alt="">` : '<span class="acc-av"></span>'}<b class="mono">@${esc(a.handle)}</b><select data-accsnd="${k}">${Object.entries(SOUNDS).map(([s, l]) => `<option value="${s}" ${s === a.sound ? 'selected' : ''}>${l}</option>`).join('')}</select><button class="btn sm" data-play="${esc(a.sound)}" aria-label="Play the sound">▶</button><button class="btn sm" data-accrm="${k}">Remove</button></div>`; }).join('') : '<p class="empty">No accounts yet. Try @WatcherGuru, @tier10k or @elonmusk.</p>'}</div>
           <h3 style="margin-top:22px">Notify me about</h3>
           <div class="toggles">
             <label class="tg"><input type="checkbox" data-n="shocks" ${ns.notify?.shocks !== false ? 'checked' : ''}><span></span><b>Shocks</b><em>Fast moves on heavy volume</em></label>
             <label class="tg"><input type="checkbox" data-n="headlines" ${ns.notify?.headlines !== false ? 'checked' : ''}><span></span><b>Headlines</b><em>News about the coins you watch</em></label>
             <label class="tg"><input type="checkbox" data-n="alerts" ${ns.notify?.alerts !== false ? 'checked' : ''}><span></span><b>Price alerts</b><em>When one of your levels is hit</em></label>
           </div>
-          <p class="sub" style="margin-top:10px">${lastNotified ? `Last notification ${agoText(new Date(lastNotified.at).toISOString())}: ${esc(lastNotified.msg.slice(0, 80))}. ` : 'Nothing to notify since this window opened: notifications come for shocks, headlines that name a coin you watch, and price alerts, while Kairos is open. '}${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Browser notifications are on.' : 'Turn on browser notifications at the top of this page to get them outside the tab.'}</p>
+          <div class="snd-row">${[['alerts', 'Price alerts'], ['shocks', 'Shocks'], ['headlines', 'Headlines']].map(([k, l]) => `<label>${l}<select data-snd="${k}">${Object.entries(SOUNDS).map(([s, n]) => `<option value="${s}" ${s === ((ns.sounds || {})[k] || { alerts: 'alarm', shocks: 'alert', headlines: 'pop' }[k]) ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`).join('')}</div>
+          <p class="sub" style="margin-top:10px">${lastNotified ? `Last notification ${agoText(new Date(lastNotified.at).toISOString())}: ${esc(lastNotified.msg.slice(0, 80))}. ` : 'Nothing to notify since this window opened: notifications come for posts from the accounts you track, shocks, headlines that name a coin you watch, and price alerts, while Kairos is open. '}${typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Browser notifications are on.' : 'Turn on browser notifications at the top of this page to get them outside the tab.'}</p>
         </div>
         <div class="card"><h3>Forward alerts from anywhere</h3>
           <p class="sub" style="margin:6px 0 14px">j7tracker through a Telegram or Discord bot, TradingView, n8n, Zapier or a script: anything that can send a web request can feed the agents. Kairos reads your private address every 30 seconds, ${web ? 'right here in the browser.' : 'with no tunnel needed.'}</p>
@@ -447,7 +454,7 @@ const views = {
       if (typeof Notification === 'undefined') return toast('This browser has no notifications', true);
       if (Notification.permission === 'denied') return toast('Notifications are blocked for this site: allow them in the browser\'s site settings (the icon left of the address bar), then reload.', true);
       const ok = (await Notification.requestPermission()) === 'granted'; toast(ok ? 'Notifications on' : 'Notifications blocked', !ok); if (ok) notifyUser('Notifications are on. Argus will tell you about shocks, headlines on your coins and price alerts.'); render(); };
-    if ($('#notifyTest')) $('#notifyTest').onclick = async () => toast(await notifyUser('Test notification from Argus. If you see this, alerts will reach you.') ? 'Test sent. Nothing showed up? Allow notifications for your browser (or Kairos) in your computer\'s notification settings, and turn off Do Not Disturb or Focus.' : 'Could not send it: notifications are not allowed here', false);
+    if ($('#notifyTest')) $('#notifyTest').onclick = async () => { banner({ title: 'Argus · test', body: 'This is how alerts look and sound. When Kairos is in the background they also show as your computer\'s notifications.', sound: (d.sounds || {}).alerts || 'alarm' }); await notifyUser('Test from Argus: your computer\'s notifications work.', { silent: true }); };
     const put = async (body, msg) => { await api('/news/settings', { method: 'PUT', body }); if (msg) toast(msg); render(); };
     $('#nSave').onclick = () => busy($('#nSave'), async () => {
       const body = { tree: $('#nTree').checked, rss: $('#nRss').checked, x: $('#nX').checked, watch: $('#nWatch').value.split(',') };
@@ -459,6 +466,12 @@ const views = {
     view.querySelectorAll('[data-rm]').forEach(b => (b.onclick = () => put({ removeAlert: b.dataset.rm }, 'Alert removed')));
     view.querySelectorAll('[data-rearm]').forEach(b => (b.onclick = () => put({ rearmAlert: b.dataset.rearm }, 'Alert re-armed')));
     view.querySelectorAll('[data-n]').forEach(c => (c.onchange = () => put({ notify: Object.fromEntries([...view.querySelectorAll('[data-n]')].map(x => [x.dataset.n, x.checked])) }, 'Notifications updated')));
+    const accs = () => (ns.accounts || []).map(a => ({ ...a }));
+    $('#accForm').onsubmit = e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)), h = f.handle.replace(/^@/, '').trim(); if (!/^[A-Za-z0-9_]{1,15}$/.test(h)) return toast('An X handle has letters, numbers and _ only, up to 15', true); playSound(f.sound); put({ accounts: [...accs(), { handle: h, sound: f.sound }] }, `Tracking @${h}`).catch(fail); };
+    view.querySelectorAll('[data-accsnd]').forEach(s => (s.onchange = () => { const a = accs(); a[+s.dataset.accsnd].sound = s.value; playSound(s.value); put({ accounts: a }, 'Sound saved').catch(fail); }));
+    view.querySelectorAll('[data-accrm]').forEach(b => (b.onclick = () => { const a = accs(); const [gone] = a.splice(+b.dataset.accrm, 1); put({ accounts: a }, `Stopped tracking @${gone.handle}`).catch(fail); }));
+    view.querySelectorAll('[data-play]').forEach(b => (b.onclick = () => playSound(b.dataset.play)));
+    view.querySelectorAll('[data-snd]').forEach(s => (s.onchange = () => { playSound(s.value); put({ sounds: Object.fromEntries([...view.querySelectorAll('[data-snd]')].map(x => [x.dataset.snd, x.value])) }, 'Sound saved').catch(fail); }));
     $('#nRelay').onchange = e => put({ relay: e.target.checked }, e.target.checked ? 'Receiving forwarded alerts' : 'Forwarded alerts off');
     view.querySelectorAll('[data-copy]').forEach(b => (b.onclick = async () => { const v = $(b.dataset.copy).value; try { await navigator.clipboard.writeText(v); } catch { $(b.dataset.copy).select(); document.execCommand('copy'); } toast('Copied'); }));
     $('#nTest').onclick = async () => { await api('/news/test', { method: 'POST' }); toast('Test alert added to the feed'); render(); };
@@ -855,26 +868,86 @@ function openShare(trades, month){
   $('#dlg').addEventListener('close', () => cancelAnimationFrame(raf), { once: true });
 }
 
+/* opening loader: 0 → 100 over the pixel wave, like the website, every time the app opens */
+(function opening() {
+  const el = document.getElementById('loader'); if (!el) return;
+  const cv = document.getElementById('ldPx'), ctx = cv.getContext('2d'), CELL = 20, n = document.getElementById('ldN'), bar = document.getElementById('ldB');
+  const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+  let W = 0, H = 0, t = Math.random() * 100, done = false;
+  const size = () => { const d = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * d; cv.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); };
+  const draw = () => { ctx.clearRect(0, 0, W, H); const cols = Math.ceil(W / CELL) + 1, rows = Math.ceil(H / CELL) + 1;
+    for (let i = 0; i < cols; i++) { const u = i / cols, cy = (.62 + .1 * Math.sin(u * 6.5 + t * .3 + 1) + .05 * Math.sin(u * 17 - t * .45)) * H, bw = .14 * H;
+      for (let j = 0; j < rows; j++) { const x = i * CELL, y = j * CELL, h = hash(i, j), fl = .5 + .5 * Math.sin(t * 1.3 + h * 40), v = 1 - Math.abs(y - cy) / bw + (h - .5) * .55 + (fl - .5) * .25;
+        if (v > .62) { ctx.fillStyle = u > .55 ? '#0055ff' : '#1d3cb0'; ctx.fillRect(x + 3, y + 3, 13, 13); }
+        else if (v > .42) { ctx.fillStyle = u > .4 ? '#4d8dff' : '#2a4dd0'; ctx.fillRect(x + 4, y + 4, 10, 10); }
+        else if (v > .22 && h > .45) { ctx.fillStyle = '#97e6ff'; ctx.fillRect(x + 6, y + 6, 6, 6); }
+        else { ctx.fillStyle = 'rgba(151,230,255,.16)'; ctx.fillRect(x + 8, y + 8, 2, 2); } } } };
+  size(); addEventListener('resize', size);
+  const t0 = performance.now(), D = 2000;
+  (function step(ts) {
+    if (done) return; t += .05; draw();
+    const p = Math.min(1, (ts - t0) / D), v = Math.round((1 - Math.pow(1 - p, 3)) * 100); n.textContent = v; bar.style.width = v + '%';
+    if (p < 1) return requestAnimationFrame(step);
+    done = true; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 1100); }, 160);
+  })(t0);
+})();
+
 let newsSeen = null, lastNotified = null;
-async function notifyUser(body) {
+/* sounds, made in the browser (nothing to download): each one a few short notes */
+const SOUNDS = { chime: 'Chime', ping: 'Ping', pop: 'Pop', alert: 'Alert', alarm: 'Alarm', coin: 'Coin', none: 'No sound' };
+let audioCtx = null;
+const audio = () => { try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch { /* no audio */ } return audioCtx; };
+addEventListener('pointerdown', audio, { once: true }); addEventListener('keydown', audio, { once: true }); // browsers allow sound after a first click
+function playSound(name = 'chime') {
+  const ac = audio(); if (!ac || name === 'none') return;
+  const notes = { chime: [[880, 0, .5, 'sine'], [1320, .12, .6, 'sine']], ping: [[1568, 0, .35, 'sine']], pop: [[660, 0, .08, 'triangle'], [990, .07, .12, 'triangle']],
+    alert: [[740, 0, .14, 'square'], [988, .16, .14, 'square'], [740, .32, .14, 'square']], alarm: [[880, 0, .18, 'sawtooth'], [660, .2, .18, 'sawtooth'], [880, .4, .18, 'sawtooth'], [660, .6, .18, 'sawtooth']],
+    coin: [[988, 0, .09, 'square'], [1319, .09, .35, 'square']] }[name] || [];
+  const t0 = ac.currentTime + .02;
+  for (const [f, at, len, type] of notes) {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f;
+    const vol = type === 'sine' ? .22 : type === 'triangle' ? .2 : .07;
+    g.gain.setValueAtTime(0, t0 + at); g.gain.linearRampToValueAtTime(vol, t0 + at + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + at + len);
+    o.connect(g).connect(ac.destination); o.start(t0 + at); o.stop(t0 + at + len + .05);
+  }
+}
+/* a notification card in the top-right corner, like a chat app: icon, who, what, when; click opens it */
+function banner({ title, body, icon, url, sound }) {
+  let box = document.getElementById('banners'); if (!box) { box = document.createElement('div'); box.id = 'banners'; box.setAttribute('aria-live', 'polite'); document.body.append(box); }
+  const el = document.createElement(url ? 'a' : 'div'); el.className = 'bn';
+  if (url) { el.href = url; el.target = '_blank'; el.rel = 'noopener noreferrer'; }
+  el.innerHTML = `<img src="${esc(icon || '../assets/icon-192.png')}" alt="" onerror="this.src='../assets/icon-192.png'"><div><div class="bn-h"><b>${esc(title)}</b><span>now</span></div><p>${esc(body)}</p></div><button class="bn-x" aria-label="Dismiss">×</button>`;
+  el.querySelector('.bn-x').onclick = e => { e.preventDefault(); e.stopPropagation(); el.remove(); };
+  box.prepend(el); while (box.children.length > 4) box.lastChild.remove();
+  requestAnimationFrame(() => el.classList.add('in')); setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 400); }, 8000);
+  playSound(sound);
+}
+async function notifyUser(body, { title = 'Argus · Kairos', icon = '../assets/icon-192.png', silent = false } = {}) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
-  try { const reg = await navigator.serviceWorker?.getRegistration?.(); if (reg?.showNotification) { await reg.showNotification('Argus · Kairos', { body, icon: '../assets/icon-192.png', tag: 'argus-' + Date.now() }); return true; } } catch { /* fall back */ }
-  try { new Notification('Argus · Kairos', { body, icon: '../assets/icon-192.png' }); return true; } catch { return false; }
+  const opts = { body, icon, silent, tag: 'argus-' + Date.now() };
+  try { const reg = await navigator.serviceWorker?.getRegistration?.(); if (reg?.showNotification) { await reg.showNotification(title, opts); return true; } } catch { /* fall back */ }
+  try { new Notification(title, opts); return true; } catch { return false; }
+}
+/* one event: the card top right with its sound, plus the computer's own notification when Kairos is in the background */
+function alertUser(ev) {
+  banner(ev); lastNotified = { at: Date.now(), msg: `${ev.title}: ${ev.body}` };
+  if (document.hidden || !document.hasFocus()) notifyUser(ev.body, { title: ev.title, icon: ev.icon, silent: ev.sound !== 'none' });
 }
 async function watchNews() {
   try {
     const d = await api('/news'), watch = new Set(d.watch.map(a => a.split('-')[0]));
     const nf = d.notify || {}, alerts = d.alerts || [];
-    const latest = Math.max(0, ...d.shocks.map(s => s.t), ...alerts.map(a => a.t), ...d.items.filter(i => i.coins.some(c => watch.has(c))).map(i => i.seenAt || 0));
+    const snd = d.sounds || {}, accs = new Map((d.accounts || []).map(a => [a.handle.toLowerCase(), a])), tracked = i => i.account && accs.get(i.account.toLowerCase());
+    const latest = Math.max(0, ...d.shocks.map(s => s.t), ...alerts.map(a => a.t), ...d.items.filter(i => tracked(i) || i.coins.some(c => watch.has(c))).map(i => i.seenAt || 0));
     if (newsSeen === null) { newsSeen = latest; return; }
+    const isNew = i => (i.seenAt || 0) > newsSeen, text = i => i.title.replace(/^[^:]{0,60}\(@[A-Za-z0-9_]+\):\s*/, '').slice(0, 160);
     const fresh = [
-      ...(nf.alerts !== false ? alerts.filter(a => a.t > newsSeen).map(a => `Alert: ${a.asset} ${a.op} ${a.price} (now ${a.firedPrice})${a.note ? ' · ' + a.note : ''}`) : []),
-      ...(nf.shocks !== false ? d.shocks.filter(s => s.t > newsSeen).map(s => `Shock ${s.asset} ${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min`) : []),
-      ...(nf.headlines !== false ? d.items.filter(i => (i.seenAt || 0) > newsSeen && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => i.title.slice(0, 120)) : [])];
+      ...d.items.filter(i => isNew(i) && tracked(i)).slice(0, 5).map(i => ({ title: `@${i.account}`, body: text(i), icon: i.avatar, url: i.url, sound: tracked(i).sound })),
+      ...(nf.alerts !== false ? alerts.filter(a => a.t > newsSeen).map(a => ({ title: `Price alert · ${marketName(a.asset)}`, body: `${a.op === 'above' ? 'Above' : 'Below'} ${a.price} (now ${a.firedPrice})${a.note ? ' · ' + a.note : ''}`, sound: snd.alerts || 'alarm' })) : []),
+      ...(nf.shocks !== false ? d.shocks.filter(s => s.t > newsSeen).map(s => ({ title: `Shock · ${marketName(s.asset)}`, body: `${s.movePct > 0 ? '+' : ''}${s.movePct}% in ${s.mins || 3} min on heavy volume`, sound: snd.shocks || 'alert' })) : []),
+      ...(nf.headlines !== false ? d.items.filter(i => isNew(i) && !tracked(i) && i.coins.some(c => watch.has(c))).slice(0, 3).map(i => ({ title: i.source, body: i.title.slice(0, 160), icon: i.avatar, url: i.url, sound: snd.headlines || 'pop' })) : [])];
     newsSeen = Math.max(newsSeen, latest);
-    for (const msg of fresh) {
-      toast(msg); notifyUser(msg); lastNotified = { at: Date.now(), msg };
-    }
+    fresh.forEach((ev, k) => setTimeout(() => alertUser(ev), k * 700));
     if (fresh.length && current === 'news') render();
   } catch { /* server restarting */ }
 }

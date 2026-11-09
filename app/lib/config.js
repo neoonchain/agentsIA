@@ -38,7 +38,9 @@ const DEFAULTS = {
   roles: { lead: 'opus', psychology: 'fable', scribe: 'sonnet', reviewer: 'gpt', charts: 'astra', context: 'gemini', sentiment: 'grok' },
   enabledRoles: { lead: true, psychology: true, scribe: true, reviewer: true, charts: true, context: false, sentiment: false },
   webSearch: false,
-  news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '', relay: true, relayTopic: '', alerts: [], notify: { shocks: true, headlines: true, alerts: true } },
+  news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '', relay: true, relayTopic: '', alerts: [], notify: { shocks: true, headlines: true, alerts: true },
+    // X accounts you follow in Argus (from Tree of Alpha or your X key): every post notifies you with its own sound
+    accounts: [], sounds: { alerts: 'alarm', shocks: 'alert', headlines: 'pop' } },
   xBearer: '',
   // KAIROS holder gate: off until the token exists. With a token address and a price, using the app's features needs a
   // signed-in wallet holding at least minUsd of KAIROS; guests can still look at everything.

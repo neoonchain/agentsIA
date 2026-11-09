@@ -405,6 +405,29 @@ label.ri input{width:auto}
 
 /* KAIROS holder gate */
 .walletbtn[hidden]{display:none}
+/* opening: count 0 to 100 over the pixel wave, then lift away (every time the app opens) */
+#loader{position:fixed;inset:0;z-index:400;background:var(--ink);color:#fff;clip-path:inset(0 0 0 0);transition:clip-path 1s cubic-bezier(.7,0,.2,1)}
+#loader.out{clip-path:inset(0 0 100% 0)}
+#loader canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.55}
+#loader .ld-n{position:absolute;left:clamp(16px,4vw,48px);bottom:clamp(4px,3vw,30px);font-size:clamp(96px,18vw,270px);font-weight:300;letter-spacing:-.06em;line-height:1;font-variant-numeric:tabular-nums}
+#loader .ld-bar{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--sky);transition:width .2s linear}
+#loader .ld-tag{position:absolute;right:clamp(16px,4vw,48px);bottom:clamp(16px,4vw,48px);text-align:right;line-height:2;color:#8d93ad;font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase}
+#loader .ld-tag b{font-weight:400;color:var(--sky)}
+/* notifications top right, like a chat app */
+#banners{position:fixed;top:16px;right:16px;z-index:300;display:flex;flex-direction:column;gap:10px;width:min(380px,calc(100vw - 32px));pointer-events:none}
+.bn{pointer-events:auto;display:flex;gap:12px;align-items:flex-start;padding:12px 34px 12px 12px;border-radius:16px;background:rgba(250,251,253,.92);color:var(--ink);text-decoration:none;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 14px 40px rgba(1,5,33,.18);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);position:relative;opacity:0;transform:translateX(24px);transition:opacity .35s,transform .45s cubic-bezier(.2,.8,.2,1)}
+.bn.in{opacity:1;transform:none}
+.bn img{width:40px;height:40px;border-radius:10px;flex:none;object-fit:cover;background:#fff}
+.bn>div{min-width:0;flex:1}.bn-h{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}.bn-h b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bn-h span{color:var(--mute-2);font-size:12px;flex:none}
+.bn p{margin-top:2px;font-size:13.5px;line-height:1.4;color:var(--mute);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.bn-x{position:absolute;top:8px;right:10px;border:0;background:none;color:var(--mute-2);font-size:18px;line-height:1;cursor:pointer}
+:root[data-theme="dark"] .bn{background:rgba(44,47,53,.94);color:#eef0f5;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 14px 40px rgba(0,0,0,.5)}:root[data-theme="dark"] .bn p{color:#b9bdc9}
+.acc-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.acc-form input{flex:1 1 180px;width:auto;min-width:150px}.acc-form select{flex:0 0 auto;width:auto}.acc-form .btn{flex:none}
+.acc select{width:auto}
+.acc-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.acc{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}.acc b{flex:1;font-size:13px}
+.acc img,.acc-av{width:26px;height:26px;border-radius:50%;flex:none;background:var(--soft)}
+.snd-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.snd-row label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute-2)}
 .walletbtn{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border-radius:999px;background:var(--card);box-shadow:0 0 0 1px var(--line);color:var(--ink);font-size:13px;font-weight:500;white-space:nowrap}
 .walletbtn small{color:var(--mute-2);font-size:11.5px;margin-left:2px}
 .walletbtn .dot{width:8px;height:8px;border-radius:50%;background:#f0a03c}.walletbtn .dot.ok{background:#22c58b}

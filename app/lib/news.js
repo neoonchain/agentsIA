@@ -72,6 +72,7 @@ export const SOURCES = {
     return rows.map(x => ({
       id: 'tree:' + x._id, time: Number(x.time) || Date.now(), title: String(x.title || '').replace(/\s+/g, ' ').slice(0, 400), url: x.url || '',
       source: `Tree of Alpha · ${x.source === 'Twitter' ? 'X' : x.sourceName || x.source || 'news'}`,
+      account: (String(x.title || '').match(/\(@([A-Za-z0-9_]{1,15})\)/) || [])[1] || null, avatar: /^https:\/\//.test(x.icon || '') ? x.icon : null,
       tags: (x.suggestions || []).map(s => s.coin).filter(Boolean),
     }));
   },
@@ -90,7 +91,7 @@ export const SOURCES = {
     const q = new URLSearchParams({ query, max_results: '25', 'tweet.fields': 'created_at,author_id', expansions: 'author_id', 'user.fields': 'username' });
     const j = await getJSON(`https://api.x.com/2/tweets/search/recent?${q}`, { Authorization: `Bearer ${bearer}` });
     const users = Object.fromEntries((j.includes?.users || []).map(u => [u.id, u.username]));
-    return (j.data || []).map(t => ({ id: 'x:' + t.id, time: Date.parse(t.created_at) || Date.now(), title: `@${users[t.author_id] || 'x'}: ${String(t.text).replace(/\s+/g, ' ').slice(0, 400)}`, url: `https://x.com/i/status/${t.id}`, source: 'X API', tags: [] }));
+    return (j.data || []).map(t => ({ id: 'x:' + t.id, time: Date.parse(t.created_at) || Date.now(), title: `@${users[t.author_id] || 'x'}: ${String(t.text).replace(/\s+/g, ' ').slice(0, 400)}`, url: `https://x.com/i/status/${t.id}`, source: 'X API', account: users[t.author_id] || null, tags: [] }));
   },
 };
 
