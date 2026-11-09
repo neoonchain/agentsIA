@@ -29,6 +29,14 @@ export const FREE_LIMIT = 2;
 export const DEFAULT_FREE_PROXY = '';
 export const freeProxyUrl = c => (process.env.KAIROS_FREE_PROXY ?? c.freeProxyUrl ?? DEFAULT_FREE_PROXY).replace(/\/+$/, '');
 
+// X accounts Argus follows out of the box (all in Tree of Alpha's free feed); each can be removed or get another sound.
+export const DEFAULT_ACCOUNTS = [
+  { handle: 'realDonaldTrump', sound: 'alarm' }, { handle: 'elonmusk', sound: 'chime' }, { handle: 'tier10k', sound: 'ping' },
+  { handle: 'WatcherGuru', sound: 'coin' }, { handle: 'DeItaone', sound: 'alert' }, { handle: 'whale_alert', sound: 'pop' },
+  { handle: 'cz_binance', sound: 'chime' }, { handle: 'saylor', sound: 'coin' }, { handle: 'VitalikButerin', sound: 'ping' },
+  { handle: 'WuBlockchain', sound: 'pop' }, { handle: 'federalreserve', sound: 'alarm' }, { handle: 'SECGov', sound: 'alert' },
+];
+
 const DEFAULTS = {
   vaultPath: path.join(os.homedir(), 'TradingVault'),
   apiKey: '',
@@ -40,7 +48,7 @@ const DEFAULTS = {
   webSearch: false,
   news: { tree: true, rss: true, x: false, xQuery: '(from:tier10k OR from:WatcherGuru OR from:DeItaone OR from:whale_alert OR from:elonmusk) -is:retweet', watch: ['BTC-USD', 'ETH-USD', 'DOGE-USD', 'PEPE-USD'], webhookToken: '', relay: true, relayTopic: '', alerts: [], notify: { shocks: true, headlines: true, alerts: true },
     // X accounts you follow in Argus (from Tree of Alpha or your X key): every post notifies you with its own sound
-    accounts: [], sounds: { alerts: 'alarm', shocks: 'alert', headlines: 'pop' } },
+    accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a })), accountsVersion: 1, sounds: { alerts: 'alarm', shocks: 'alert', headlines: 'pop' } },
   xBearer: '',
   // KAIROS holder gate: off until the token exists. With a token address and a price, using the app's features needs a
   // signed-in wallet holding at least minUsd of KAIROS; guests can still look at everything.
@@ -70,6 +78,11 @@ export function loadConfig() {
   if (!c.news.webhookToken) c.news.webhookToken = crypto.randomUUID().replace(/-/g, '');
   if (!c.news.relayTopic) c.news.relayTopic = 'kairos-' + crypto.randomUUID().replace(/-/g, '').slice(0, 24); // private ntfy.sh topic for forwarded alerts
   c.news.alerts ||= []; c.news.notify ||= { shocks: true, headlines: true, alerts: true };
+  if (saved.news && !saved.news.accountsVersion) { // configs saved before default accounts existed: add them, keep the user's own
+    const have = new Set((c.news.accounts || []).map(a => a.handle.toLowerCase()));
+    c.news.accounts = [...(c.news.accounts || []), ...DEFAULT_ACCOUNTS.filter(a => !have.has(a.handle.toLowerCase())).map(a => ({ ...a }))];
+    c.news.accountsVersion = 1;
+  }
   if (!c.installId) { c.installId = crypto.randomUUID(); try { saveConfig(c); } catch { /* read-only home: id stays per session */ } }
   return c;
 }

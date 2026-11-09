@@ -60,6 +60,7 @@ export function createApi(app) {
       if (typeof b.relay === 'boolean') n.relay = b.relay;
       if (b.notify && typeof b.notify === 'object') n.notify = { shocks: !!b.notify.shocks, headlines: !!b.notify.headlines, alerts: !!b.notify.alerts };
       const SOUNDS = ['chime', 'ping', 'pop', 'alert', 'alarm', 'coin', 'none'], snd = v => SOUNDS.includes(v) ? v : 'chime';
+      if (Array.isArray(b.accounts)) n.accountsVersion = 1;
       if (Array.isArray(b.accounts)) n.accounts = b.accounts.map(a => ({ handle: String(a.handle || '').replace(/^@/, '').trim(), sound: snd(a.sound) }))
         .filter((a, i, all) => /^[A-Za-z0-9_]{1,15}$/.test(a.handle) && all.findIndex(x => x.handle.toLowerCase() === a.handle.toLowerCase()) === i).slice(0, 30);
       if (b.sounds && typeof b.sounds === 'object') n.sounds = Object.fromEntries(['alerts', 'shocks', 'headlines'].map(k => [k, snd(b.sounds[k] ?? n.sounds?.[k])]));
