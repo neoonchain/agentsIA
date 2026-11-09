@@ -72,7 +72,8 @@ export const SOURCES = {
     return rows.map(x => ({
       id: 'tree:' + x._id, time: Number(x.time) || Date.now(), title: String(x.title || '').replace(/\s+/g, ' ').slice(0, 400), url: x.url || '',
       source: `Tree of Alpha · ${x.source === 'Twitter' ? 'X' : x.sourceName || x.source || 'news'}`,
-      account: (String(x.title || '').match(/\(@([A-Za-z0-9_]{1,15})\)/) || [])[1] || null, avatar: /^https:\/\//.test(x.icon || '') ? x.icon : null,
+      account: x.source === 'Twitter' ? (String(x.title || '').match(/\(@([A-Za-z0-9_]{1,15})\)/) || [])[1] || null : x.sourceName ? String(x.sourceName).toUpperCase() : null,
+      accountKind: x.source === 'Twitter' ? 'x' : 'source', avatar: /^https:\/\//.test(x.icon || '') ? x.icon : null,
       tags: (x.suggestions || []).map(s => s.coin).filter(Boolean),
     }));
   },
@@ -108,7 +109,7 @@ export const DEFAULT_RSS = ['https://cointelegraph.com/rss', 'https://www.theblo
 
 /* ---------------- the hub ---------------- */
 export class NewsHub {
-  constructor({ max = 400 } = {}) { this.items = []; this.ids = new Set(); this.shocks = []; this.status = {}; this.max = max; }
+  constructor({ max = 400 } = {}) { this.items = []; this.ids = new Set(); this.shocks = []; this.status = {}; this.max = max; this.accountsSeen = {}; this.since = Date.now(); }
   /** Add items; returns the ones that were new. */
   ingest(items) {
     const fresh = [];
@@ -116,6 +117,7 @@ export class NewsHub {
       if (!it || !it.title || this.ids.has(it.id)) continue;
       const item = { ...it, coins: coinsIn(it.title, it.tags || []), seenAt: Date.now() };
       this.ids.add(item.id); this.items.push(item); fresh.push(item);
+      if (item.account) { const k = item.account.toLowerCase(); this.accountsSeen[k] = Math.max(this.accountsSeen[k] || 0, item.time || 0); }
     }
     this.items.sort((a, b) => b.time - a.time);
     if (this.items.length > this.max) for (const x of this.items.splice(this.max)) this.ids.delete(x.id);
