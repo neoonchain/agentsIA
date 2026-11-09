@@ -786,6 +786,7 @@ function openShare(trades, month){
   const cv = $('#shareCv'), ctx = cv.getContext('2d'), W = 1080, H = 1350;
   const vb = document.querySelector('#kaiVector')?.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, 32, 32];
   const markD = document.querySelector('#kaiVector path')?.getAttribute('d');
+  const kaiImg = new Image(); kaiImg.src = '../assets/kai-mark.png'; // the gradient logo, on a white tile so its navy half stays visible on the dark card
   const data = () => { const ts = trades.filter(t => st.period === 'all' || String(t.date).startsWith(st.period)).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const pnl = ts.reduce((a, t) => a + t.pnl, 0), r = ts.reduce((a, t) => a + (+t.r || 0), 0), w = ts.filter(t => t.pnl > 0).length, gl = -ts.filter(t => t.pnl < 0).reduce((a, t) => a + t.pnl, 0), gp = ts.filter(t => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
     let c = 0; const curve = [0, ...ts.map(t => (c += t.pnl))];
@@ -802,8 +803,9 @@ function openShare(trades, month){
   function frame(p){ // p: 0..1 count progress
     const d = data(), k = ease(Math.min(1, p)); bg(p);
     ctx.fillStyle = '#fff'; ctx.textBaseline = 'alphabetic';
-    if (markD) { ctx.save(); ctx.translate(80, 86); ctx.scale(56 / vb[2], 56 / vb[3]); ctx.translate(-vb[0], -vb[1]); ctx.fill(new Path2D(markD), 'evenodd'); ctx.restore(); }
-    ctx.font = '600 46px Geist, system-ui, sans-serif'; ctx.fillText('kairos', 150, 130);
+    if (kaiImg.complete && kaiImg.naturalWidth) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.roundRect(74, 80, 68, 68, 16); ctx.fill(); ctx.drawImage(kaiImg, 84, 90, 48, 48); ctx.fillStyle = '#fff'; }
+    else if (markD) { ctx.save(); ctx.translate(80, 86); ctx.scale(56 / vb[2], 56 / vb[3]); ctx.translate(-vb[0], -vb[1]); ctx.fill(new Path2D(markD), 'evenodd'); ctx.restore(); }
+    ctx.font = '600 46px Geist, system-ui, sans-serif'; ctx.fillText('kairos', 160, 130);
     ctx.font = '500 26px "Geist Mono", monospace'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.7)';
     ctx.fillText((st.period === 'all' ? 'ALL TIME' : new Date(st.period + '-01T00:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase()) + ' · PNL', W - 80, 126); ctx.textAlign = 'left';
     const val = st.unit === 'usd' ? d.pnl : st.unit === 'r' ? d.r : d.pct, cur = val * k;
